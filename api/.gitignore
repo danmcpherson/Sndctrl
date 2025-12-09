@@ -7,9 +7,6 @@ data/
 *.db-shm
 *.db-wal
 
-# Azure Functions localsettings file
-local.settings.json
-
 # User-specific files
 *.suo
 *.user
