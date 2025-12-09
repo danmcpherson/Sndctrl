@@ -15,11 +15,20 @@
                 <div class="header-content">
                     <h1 class="logo">SonosSoundHub</h1>
                     <div class="header-actions">
-                        <button id="discover-btn" class="btn btn-secondary">
-                            <span class="icon">🔍</span>
-                            Discover Speakers
+                        <button id="refresh-btn" class="btn btn-icon" onclick="speakers.updateAllSpeakers()" title="Refresh speaker status">
+                            <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
                         </button>
-                        <div id="status-indicator" class="status-indicator">
+                        <button id="discover-btn" class="btn btn-secondary" onclick="speakers.discover()">
+                            <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            Discover
+                        </button>
+                        <div id="status-indicator" class="status-indicator" title="Click to test connection" onclick="testConnection()">
                             <span class="status-dot"></span>
                             <span class="status-text">Connecting...</span>
                         </div>
@@ -59,10 +68,23 @@
                     <div class="section-header">
                         <h2>Macros</h2>
                         <p class="subtitle">Create and manage custom automation sequences</p>
-                        <button id="new-macro-btn" class="btn btn-primary">
-                            <span class="icon">➕</span>
-                            New Macro
-                        </button>
+                        <div class="header-actions">
+                            <button id="new-macro-btn" class="btn btn-primary">
+                                <span class="icon">+</span>
+                                New Macro
+                            </button>
+                            <div class="btn-group">
+                                <button id="export-macros-btn" class="btn btn-secondary" title="Export macros">
+                                    <span class="icon">↓</span>
+                                    Export
+                                </button>
+                                <button id="import-macros-btn" class="btn btn-secondary" title="Import macros">
+                                    <span class="icon">↑</span>
+                                    Import
+                                </button>
+                            </div>
+                        </div>
+                        <input type="file" id="import-file-input" accept=".txt" style="display: none;">
                     </div>
                     <div id="macros-list" class="macros-list">
                         <!-- Macro cards will be inserted here -->
@@ -73,11 +95,46 @@
                 <div id="favorites-tab" class="tab-content">
                     <div class="section-header">
                         <h2>Favorites</h2>
-                        <p class="subtitle">Quick access to your Sonos favorites</p>
+                        <p class="subtitle">Quick access to your Sonos favorites, playlists, and radio</p>
+                        <div class="header-actions">
+                            <select id="favorites-speaker-select" class="form-control" style="width: auto; min-width: 150px;">
+                                <option value="">Select speaker...</option>
+                            </select>
+                        </div>
                     </div>
-                    <div id="favorites-list" class="favorites-list">
-                        <div class="info-message">
-                            <p>Favorites list coming soon...</p>
+                    
+                    <!-- Sub-tabs for Favorites -->
+                    <div class="sub-tabs">
+                        <button class="favorites-sub-tab active" data-subtab="sonos-favorites">Sonos Favorites</button>
+                        <button class="favorites-sub-tab" data-subtab="playlists">Playlists</button>
+                        <button class="favorites-sub-tab" data-subtab="radio">Radio Stations</button>
+                    </div>
+
+                    <!-- Sonos Favorites Content -->
+                    <div id="sonos-favorites-content" class="favorites-sub-content active">
+                        <div id="favorites-grid" class="content-grid">
+                            <div class="loading-message">
+                                <div class="spinner"></div>
+                                <p>Loading favorites...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Playlists Content -->
+                    <div id="playlists-content" class="favorites-sub-content">
+                        <div id="playlists-grid" class="content-grid">
+                            <div class="info-message">
+                                <p>Click "Playlists" tab to load.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Radio Stations Content -->
+                    <div id="radio-content" class="favorites-sub-content">
+                        <div id="radio-grid" class="content-grid">
+                            <div class="info-message">
+                                <p>Click "Radio Stations" tab to load.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -87,8 +144,28 @@
                     <div class="section-header">
                         <h2>Queue</h2>
                         <p class="subtitle">Manage your playback queue</p>
+                        <div class="header-actions">
+                            <select id="queue-speaker-select" class="form-control" style="width: auto; min-width: 150px;">
+                                <option value="">Select speaker...</option>
+                            </select>
+                            <button id="add-sharelink-btn" class="btn btn-secondary" title="Add Spotify/Apple Music link">
+                                <span class="icon">+</span>
+                                Add Link
+                            </button>
+                            <button id="save-queue-btn" class="btn btn-secondary" title="Save queue as playlist">
+                                <span class="icon">💾</span>
+                                Save
+                            </button>
+                            <button id="clear-queue-btn" class="btn btn-secondary" title="Clear queue">
+                                <span class="icon">🗑</span>
+                                Clear
+                            </button>
+                        </div>
                     </div>
-                    <div id="queue-list" class="queue-list">
+                    <div class="queue-info">
+                        <span id="queue-count">0 tracks</span>
+                    </div>
+                    <div id="queue-tracks" class="queue-tracks-list">
                         <div class="info-message">
                             <p>Select a speaker to view its queue</p>
                         </div>
@@ -100,34 +177,154 @@
 
     <!-- Macro Editor Modal -->
     <div id="macro-editor-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content modal-wide">
             <div class="modal-header">
                 <h3 id="modal-title">Create Macro</h3>
                 <button class="modal-close" id="close-modal">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="macro-form">
-                    <div class="form-group">
-                        <label for="macro-name">Macro Name</label>
-                        <input type="text" id="macro-name" class="form-control" placeholder="e.g., morning_routine" required>
-                        <small class="form-hint">Use letters, numbers, underscores, and dashes</small>
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label for="macro-name">Macro Name</label>
+                            <input type="text" id="macro-name" class="form-control" placeholder="e.g., morning_routine" required>
+                            <small class="form-hint">Use letters, numbers, underscores, and dashes</small>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label for="macro-category">Category (optional)</label>
+                            <input type="text" id="macro-category" class="form-control" placeholder="e.g., Morning, Evening">
+                        </div>
                     </div>
 
                     <div class="form-group">
                         <label for="macro-description">Description (optional)</label>
-                        <input type="text" id="macro-description" class="form-control" placeholder="Brief description">
+                        <input type="text" id="macro-description" class="form-control" placeholder="Brief description of what this macro does">
                     </div>
 
+                    <!-- Visual Action Builder -->
                     <div class="form-group">
-                        <label for="macro-category">Category (optional)</label>
-                        <input type="text" id="macro-category" class="form-control" placeholder="e.g., Morning, Evening">
+                        <label>Actions</label>
+                        <div id="macro-actions-builder" class="actions-builder">
+                            <!-- Action rows will be added here -->
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm" id="add-action-btn" onclick="macros.addAction()">
+                            <span class="icon">+</span> Add Action
+                        </button>
                     </div>
 
-                    <div class="form-group">
-                        <label for="macro-definition">Macro Definition</label>
-                        <textarea id="macro-definition" class="form-control" rows="4" placeholder="Speaker action args : Speaker action args" required></textarea>
-                        <small class="form-hint">Format: Speaker action arguments : Speaker action arguments</small>
-                    </div>
+                    <!-- Toggle for raw definition view -->
+                    <details class="raw-definition-toggle">
+                        <summary class="raw-toggle-header">
+                            <span class="icon">⚙️</span> Advanced: Raw Definition
+                        </summary>
+                        <div class="raw-definition-content">
+                            <textarea id="macro-definition" class="form-control code-input" rows="3" placeholder="Living Room volume 40 : Kitchen play"></textarea>
+                            <small class="form-hint">Format: <code>Speaker action arguments : Speaker action arguments</code></small>
+                        </div>
+                    </details>
+
+                    <!-- Command Reference Collapsible -->
+                    <details class="command-reference">
+                        <summary class="command-reference-toggle">
+                            <span class="icon">📖</span> Command Reference
+                        </summary>
+                        <div class="command-reference-content">
+                            <div class="command-grid">
+                                <div class="command-category">
+                                    <h4>Playback</h4>
+                                    <ul>
+                                        <li><code>play</code> — Start playback</li>
+                                        <li><code>pause</code> — Pause playback</li>
+                                        <li><code>stop</code> — Stop playback</li>
+                                        <li><code>next</code> — Next track</li>
+                                        <li><code>previous</code> — Previous track</li>
+                                        <li><code>seek &lt;time&gt;</code> — Seek to time (1:30, 90s)</li>
+                                    </ul>
+                                </div>
+                                <div class="command-category">
+                                    <h4>Volume</h4>
+                                    <ul>
+                                        <li><code>volume &lt;0-100&gt;</code> — Set volume</li>
+                                        <li><code>mute on|off</code> — Mute/unmute</li>
+                                        <li><code>ramp &lt;target&gt;</code> — Gradual volume</li>
+                                        <li><code>relative_volume &lt;±n&gt;</code> — Adjust volume</li>
+                                        <li><code>group_volume &lt;0-100&gt;</code> — Set group vol</li>
+                                    </ul>
+                                </div>
+                                <div class="command-category">
+                                    <h4>EQ Settings</h4>
+                                    <ul>
+                                        <li><code>bass &lt;-10 to 10&gt;</code> — Set bass</li>
+                                        <li><code>treble &lt;-10 to 10&gt;</code> — Set treble</li>
+                                        <li><code>loudness on|off</code> — Loudness mode</li>
+                                        <li><code>night_mode on|off</code> — Night mode</li>
+                                        <li><code>dialog_mode on|off</code> — Dialog clarity</li>
+                                    </ul>
+                                </div>
+                                <div class="command-category">
+                                    <h4>Play Content</h4>
+                                    <ul>
+                                        <li><code>play_favourite "&lt;name&gt;"</code> — Play favorite</li>
+                                        <li><code>play_favourite_number &lt;n&gt;</code> — Play by #</li>
+                                        <li><code>play_uri &lt;uri&gt;</code> — Play URL/URI</li>
+                                        <li><code>cue_favourite "&lt;name&gt;"</code> — Cue silently</li>
+                                    </ul>
+                                </div>
+                                <div class="command-category">
+                                    <h4>Queue</h4>
+                                    <ul>
+                                        <li><code>play_from_queue &lt;n&gt;</code> — Play track #</li>
+                                        <li><code>clear_queue</code> — Clear queue</li>
+                                        <li><code>add_favourite_to_queue</code> — Add favorite</li>
+                                        <li><code>add_sharelink_to_queue</code> — Add Spotify link</li>
+                                    </ul>
+                                </div>
+                                <div class="command-category">
+                                    <h4>Play Mode</h4>
+                                    <ul>
+                                        <li><code>shuffle on|off</code> — Shuffle mode</li>
+                                        <li><code>repeat off|one|all</code> — Repeat mode</li>
+                                        <li><code>cross_fade on|off</code> — Crossfade</li>
+                                    </ul>
+                                </div>
+                                <div class="command-category">
+                                    <h4>Groups</h4>
+                                    <ul>
+                                        <li><code>group &lt;speaker&gt;</code> — Join group</li>
+                                        <li><code>ungroup</code> — Leave group</li>
+                                        <li><code>party_mode</code> — Group all speakers</li>
+                                        <li><code>ungroup_all</code> — Ungroup all</li>
+                                        <li><code>transfer_playback &lt;spk&gt;</code> — Transfer</li>
+                                    </ul>
+                                </div>
+                                <div class="command-category">
+                                    <h4>Sleep &amp; Wait</h4>
+                                    <ul>
+                                        <li><code>sleep &lt;30m, 1h&gt;</code> — Sleep timer</li>
+                                        <li><code>wait &lt;10s, 5m&gt;</code> — Delay action</li>
+                                        <li><code>wait_until &lt;HH:MM&gt;</code> — Wait until time</li>
+                                        <li><code>wait_start</code> — Wait for playback</li>
+                                    </ul>
+                                </div>
+                                <div class="command-category">
+                                    <h4>System</h4>
+                                    <ul>
+                                        <li><code>pause_all</code> — Pause all speakers</li>
+                                        <li><code>stop_all</code> — Stop all speakers</li>
+                                        <li><code>status_light on|off</code> — LED control</li>
+                                    </ul>
+                                </div>
+                                <div class="command-category">
+                                    <h4>Parameters</h4>
+                                    <ul>
+                                        <li><code>%1, %2, ...</code> — Dynamic params</li>
+                                        <li><code>_all_</code> — All speakers</li>
+                                        <li>Example: <code>%1 volume %2</code></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
 
                     <div class="form-actions">
                         <button type="button" class="btn btn-secondary" id="cancel-macro-btn">Cancel</button>
@@ -146,6 +343,8 @@
     <script src="js/ui-components.js"></script>
     <script src="js/speakers.js"></script>
     <script src="js/macros.js"></script>
+    <script src="js/favorites.js"></script>
+    <script src="js/queue.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

@@ -118,4 +118,53 @@ public class MacroController : ControllerBase
         }
         return StatusCode(500, new { message = "Failed to reload macros" });
     }
+
+    /// <summary>
+    /// Exports the macros file for download
+    /// </summary>
+    [HttpGet("export")]
+    public async Task<IActionResult> ExportMacros()
+    {
+        try
+        {
+            var content = await _macroService.GetMacrosFileContentAsync();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+            return File(bytes, "text/plain", "macros.txt");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export macros");
+            return StatusCode(500, new { message = "Failed to export macros" });
+        }
+    }
+
+    /// <summary>
+    /// Imports macros from an uploaded file
+    /// </summary>
+    [HttpPost("import")]
+    public async Task<IActionResult> ImportMacros(IFormFile file, [FromQuery] bool merge = false)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "No file uploaded" });
+        }
+
+        try
+        {
+            using var reader = new StreamReader(file.OpenReadStream());
+            var content = await reader.ReadToEndAsync();
+            
+            var result = await _macroService.ImportMacrosAsync(content, merge);
+            if (result.Success)
+            {
+                return Ok(new { message = result.Message, imported = result.ImportedCount });
+            }
+            return BadRequest(new { message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to import macros");
+            return StatusCode(500, new { message = $"Failed to import macros: {ex.Message}" });
+        }
+    }
 }

@@ -13,6 +13,8 @@ public class SocoCliService
     private Process? _serverProcess;
     private DateTime? _startedAt;
     private readonly int _port;
+    private readonly SemaphoreSlim _startLock = new(1, 1);
+    private bool _isStarting;
 
     public SocoCliService(ILogger<SocoCliService> logger, IConfiguration configuration)
     {
@@ -31,7 +33,43 @@ public class SocoCliService
     /// </summary>
     public bool IsRunning()
     {
-        return _serverProcess != null && !_serverProcess.HasExited;
+        try
+        {
+            return _serverProcess != null && !_serverProcess.HasExited;
+        }
+        catch (InvalidOperationException)
+        {
+            // Process was never started or has been disposed
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the full path to the sonos-http-api-server executable
+    /// </summary>
+    private string GetExecutablePath()
+    {
+        // Check common pipx installation locations
+        var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var possiblePaths = new[]
+        {
+            Path.Combine(homeDir, ".local", "bin", "sonos-http-api-server"),
+            "/usr/local/bin/sonos-http-api-server",
+            "/opt/homebrew/bin/sonos-http-api-server",
+        };
+
+        foreach (var path in possiblePaths)
+        {
+            if (File.Exists(path))
+            {
+                _logger.LogInformation("Found sonos-http-api-server at: {Path}", path);
+                return path;
+            }
+        }
+
+        // Return the command name and hope it's in PATH
+        _logger.LogWarning("Could not find sonos-http-api-server in common locations, falling back to PATH");
+        return "sonos-http-api-server";
     }
 
     /// <summary>
@@ -53,14 +91,25 @@ public class SocoCliService
     /// </summary>
     public async Task<bool> StartServerAsync()
     {
+        // Quick check without lock
         if (IsRunning())
         {
-            _logger.LogInformation("Soco-CLI server is already running");
             return true;
         }
 
+        // Acquire lock to prevent multiple simultaneous start attempts
+        await _startLock.WaitAsync();
         try
         {
+            // Double-check after acquiring lock
+            if (IsRunning() || _isStarting)
+            {
+                _logger.LogInformation("Soco-CLI server is already running or starting");
+                return true;
+            }
+
+            _isStarting = true;
+
             var macrosFile = _configuration.GetValue<string>("SocoCli:MacrosFile", "data/macros.txt");
             var useLocalCache = _configuration.GetValue<bool>("SocoCli:UseLocalCache", false);
 
@@ -76,9 +125,10 @@ public class SocoCliService
                 arguments += " --use-local-speaker-list";
             }
 
+            var executablePath = GetExecutablePath();
             var startInfo = new ProcessStartInfo
             {
-                FileName = "sonos-http-api-server",
+                FileName = executablePath,
                 Arguments = arguments,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -109,17 +159,49 @@ public class SocoCliService
             _serverProcess.BeginErrorReadLine();
             _startedAt = DateTime.UtcNow;
 
-            _logger.LogInformation("Started soco-cli HTTP API server on port {Port}", _port);
+            _logger.LogInformation("Started soco-cli HTTP API server on port {Port} with executable {Path}", _port, executablePath);
 
-            // Wait a moment for the server to start
-            await Task.Delay(2000);
+            // Wait for the server to start and become responsive
+            // Speaker discovery can take several seconds
+            for (int i = 0; i < 10; i++)
+            {
+                await Task.Delay(1000);
+                if (!IsRunning())
+                {
+                    _logger.LogError("soco-cli process exited unexpectedly");
+                    return false;
+                }
+                
+                // Try to connect to the server
+                try
+                {
+                    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                    var response = await client.GetAsync($"http://localhost:{_port}/");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("soco-cli HTTP API server is now responsive");
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Server not ready yet, keep waiting
+                    _logger.LogDebug("Waiting for soco-cli server to become responsive... ({Attempt}/10)", i + 1);
+                }
+            }
 
+            _logger.LogWarning("soco-cli server started but may not be fully responsive yet");
             return IsRunning();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to start soco-cli HTTP API server");
             return false;
+        }
+        finally
+        {
+            _isStarting = false;
+            _startLock.Release();
         }
     }
 
@@ -157,9 +239,27 @@ public class SocoCliService
     /// </summary>
     public async Task<bool> EnsureServerRunningAsync()
     {
+        // If we're tracking a running process, we're good
         if (IsRunning())
         {
             return true;
+        }
+
+        // Check if another instance is already responding on the port
+        // (e.g., from a previous run that we lost track of)
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
+            var response = await client.GetAsync($"http://localhost:{_port}/speakers");
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Found existing soco-cli server responding on port {Port}", _port);
+                return true;
+            }
+        }
+        catch
+        {
+            // No server responding, need to start one
         }
 
         return await StartServerAsync();

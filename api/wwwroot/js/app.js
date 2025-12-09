@@ -12,9 +12,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Setup event listeners
     setupEventListeners();
 
-    // Initialize speakers
+    // Initialize modules
     await speakers.init();
+    favorites.init();
+    queue.init();
 });
+
+/**
+ * Tests the connection to the soco-cli server
+ */
+async function testConnection() {
+    const indicator = document.getElementById('status-indicator');
+    const statusText = indicator.querySelector('.status-text');
+    
+    statusText.textContent = 'Testing...';
+    indicator.className = 'status-indicator';
+
+    try {
+        const status = await api.getServerStatus();
+        
+        if (status.isRunning) {
+            // Try to get speakers to confirm full connectivity
+            const speakerList = await api.getSpeakers();
+            indicator.className = 'status-indicator connected';
+            statusText.textContent = `${speakerList.length} speaker${speakerList.length !== 1 ? 's' : ''}`;
+            showToast('Connection successful', 'success');
+        } else {
+            indicator.className = 'status-indicator error';
+            statusText.textContent = 'Server not running';
+            showToast('Server is not running. Click Discover to start.', 'warning');
+        }
+    } catch (error) {
+        indicator.className = 'status-indicator error';
+        statusText.textContent = 'Connection failed';
+        showToast(`Connection test failed: ${error.message}`, 'error');
+    }
+}
 
 /**
  * Setup all event listeners
@@ -43,6 +76,25 @@ function setupEventListeners() {
     // Macro form submit
     document.getElementById('macro-form').addEventListener('submit', async (e) => {
         await macros.save(e);
+    });
+
+    // Export macros button
+    document.getElementById('export-macros-btn').addEventListener('click', async () => {
+        await macros.export();
+    });
+
+    // Import macros button
+    document.getElementById('import-macros-btn').addEventListener('click', () => {
+        macros.showImportDialog();
+    });
+
+    // Import file input change handler
+    document.getElementById('import-file-input').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            await macros.handleImportFile(file);
+            e.target.value = ''; // Reset input so same file can be selected again
+        }
     });
 
     // Close modal when clicking outside
@@ -80,6 +132,26 @@ function setupEventListeners() {
             }
         }
     });
+
+    // Tab change listener to load content
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const tabName = btn.dataset.tab;
+            // Content loading is now handled in setupTabNavigation()
+        });
+    });
+
+    // Favorites speaker selector change
+    document.getElementById('favorites-speaker-select')?.addEventListener('change', () => {
+        // Speaker selection changed - content will reload when user interacts
+    });
+
+    // Queue speaker selector change
+    document.getElementById('queue-speaker-select')?.addEventListener('change', () => {
+        queue.load();
+    });
+
+    // Note: Favorites sub-tab navigation is handled in favorites.setupEventListeners()
 }
 
 // Global error handler

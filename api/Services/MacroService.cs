@@ -28,7 +28,7 @@ public class MacroService
         _socoCliService = socoCliService;
         _httpClient = httpClient;
 
-        var dataDir = _configuration.GetValue<string>("DataDirectory", "data");
+        var dataDir = _configuration.GetValue<string>("DataDirectory") ?? "data";
         _macrosFilePath = Path.Combine(dataDir, "macros.txt");
         _metadataFilePath = Path.Combine(dataDir, "macros-metadata.json");
 
@@ -340,4 +340,126 @@ public class MacroService
             _logger.LogError(ex, "Failed to save macro metadata");
         }
     }
+
+    /// <summary>
+    /// Gets the raw macros file content for export
+    /// </summary>
+    public async Task<string> GetMacrosFileContentAsync()
+    {
+        if (!File.Exists(_macrosFilePath))
+        {
+            return string.Empty;
+        }
+        return await File.ReadAllTextAsync(_macrosFilePath);
+    }
+
+    /// <summary>
+    /// Imports macros from file content
+    /// </summary>
+    public async Task<ImportResult> ImportMacrosAsync(string content, bool merge = false)
+    {
+        var result = new ImportResult();
+
+        try
+        {
+            // Parse the imported content to validate it
+            var importedMacros = ParseMacrosFile(content);
+            
+            if (importedMacros.Count == 0)
+            {
+                result.Message = "No valid macros found in the imported file";
+                return result;
+            }
+
+            if (merge)
+            {
+                // Merge with existing macros
+                var existingContent = await GetMacrosFileContentAsync();
+                var existingMacros = ParseMacrosFile(existingContent);
+                
+                // Add new macros, skip existing ones
+                var newMacros = new List<string>();
+                foreach (var macro in importedMacros)
+                {
+                    if (!existingMacros.ContainsKey(macro.Key))
+                    {
+                        newMacros.Add($"{macro.Key} = {macro.Value}");
+                        result.ImportedCount++;
+                    }
+                }
+
+                if (newMacros.Count > 0)
+                {
+                    // Append to existing file
+                    var appendContent = "\n# Imported macros\n" + string.Join("\n", newMacros) + "\n";
+                    await File.AppendAllTextAsync(_macrosFilePath, appendContent);
+                    result.Message = $"Merged {result.ImportedCount} new macros (skipped {importedMacros.Count - result.ImportedCount} existing)";
+                }
+                else
+                {
+                    result.Message = "All macros already exist, nothing to import";
+                }
+            }
+            else
+            {
+                // Replace entire file
+                await File.WriteAllTextAsync(_macrosFilePath, content);
+                result.ImportedCount = importedMacros.Count;
+                result.Message = $"Imported {result.ImportedCount} macros (replaced existing file)";
+            }
+
+            result.Success = true;
+            
+            // Reload macros in soco-cli
+            await ReloadMacrosAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to import macros");
+            result.Message = $"Failed to import macros: {ex.Message}";
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Parses macros file content into a dictionary
+    /// </summary>
+    private Dictionary<string, string> ParseMacrosFile(string content)
+    {
+        var macros = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var lines = content.Split('\n');
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#'))
+            {
+                continue;
+            }
+
+            var equalsIndex = trimmed.IndexOf('=');
+            if (equalsIndex > 0)
+            {
+                var name = trimmed.Substring(0, equalsIndex).Trim();
+                var definition = trimmed.Substring(equalsIndex + 1).Trim();
+                if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(definition))
+                {
+                    macros[name] = definition;
+                }
+            }
+        }
+
+        return macros;
+    }
+}
+
+/// <summary>
+/// Result of a macro import operation
+/// </summary>
+public class ImportResult
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public int ImportedCount { get; set; }
 }

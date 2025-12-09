@@ -40,7 +40,7 @@ function updateStatus(isConnected, message = '') {
 }
 
 /**
- * Creates a speaker card element
+ * Creates a speaker card element with enhanced controls
  */
 function createSpeakerCard(speakerName) {
     const card = document.createElement('div');
@@ -51,6 +51,7 @@ function createSpeakerCard(speakerName) {
         <div class="speaker-header">
             <div>
                 <h3 class="speaker-name">${speakerName}</h3>
+                <div class="speaker-group-info" style="display: none;"></div>
             </div>
             <span class="speaker-status stopped">Stopped</span>
         </div>
@@ -61,10 +62,45 @@ function createSpeakerCard(speakerName) {
         </div>
         
         <div class="speaker-controls">
-            <button class="control-btn" onclick="speakers.previous('${speakerName}')">⏮</button>
-            <button class="control-btn primary" onclick="speakers.playPause('${speakerName}')">▶️</button>
-            <button class="control-btn" onclick="speakers.next('${speakerName}')">⏭</button>
-            <button class="control-btn" onclick="speakers.toggleMute('${speakerName}')">🔇</button>
+            <button class="control-btn" onclick="speakers.previous('${speakerName}')" title="Previous">⏮︎</button>
+            <button class="control-btn primary" onclick="speakers.playPause('${speakerName}')" title="Play/Pause">▶</button>
+            <button class="control-btn" onclick="speakers.next('${speakerName}')" title="Next">⏭︎</button>
+            <button class="control-btn" onclick="speakers.toggleMute('${speakerName}')" title="Mute">◖</button>
+        </div>
+        
+        <!-- Play Mode Controls (Phase 2) -->
+        <div class="playmode-controls">
+            <button class="control-btn small playmode-btn" data-control="shuffle" onclick="speakers.toggleShuffle('${speakerName}')" title="Shuffle">
+                <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="16 3 21 3 21 8"></polyline>
+                    <line x1="4" y1="20" x2="21" y2="3"></line>
+                    <polyline points="21 16 21 21 16 21"></polyline>
+                    <line x1="15" y1="15" x2="21" y2="21"></line>
+                    <line x1="4" y1="4" x2="9" y2="9"></line>
+                </svg>
+            </button>
+            <button class="control-btn small playmode-btn" data-control="repeat" onclick="speakers.cycleRepeat('${speakerName}')" title="Repeat">
+                <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="17 1 21 5 17 9"></polyline>
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                    <polyline points="7 23 3 19 7 15"></polyline>
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                </svg>
+            </button>
+            <button class="control-btn small" onclick="speakers.showSleepTimer('${speakerName}')" title="Sleep Timer">
+                <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+            </button>
+            <button class="control-btn small" onclick="speakers.showGroupMenu('${speakerName}')" title="Grouping">
+                <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+            </button>
         </div>
         
         <div class="volume-control">
@@ -112,13 +148,13 @@ function createMacroCard(macro) {
         <div class="macro-definition">${macro.definition}</div>
         <div class="macro-actions-bar">
             <button class="btn btn-primary btn-sm" onclick="macros.execute('${macro.name}')">
-                ▶️ Run
+                Run
             </button>
             <button class="btn btn-secondary btn-sm" onclick="macros.edit('${macro.name}')">
-                ✏️ Edit
+                Edit
             </button>
             <button class="btn btn-secondary btn-sm" onclick="macros.delete('${macro.name}')">
-                🗑️ Delete
+                Delete
             </button>
         </div>
     `;
@@ -157,8 +193,20 @@ function setupTabNavigation() {
             document.getElementById(`${tabName}-tab`).classList.add('active');
             
             // Trigger tab-specific actions
-            if (tabName === 'macros') {
-                macros.load();
+            console.log('Tab switched to:', tabName);
+            switch(tabName) {
+                case 'macros':
+                    macros.load();
+                    break;
+                case 'favorites':
+                    favorites.updateSpeakerSelector();
+                    favorites.switchSubTab('sonos-favorites');
+                    break;
+                case 'queue':
+                    console.log('Loading queue tab...');
+                    queue.updateSpeakerSelector();
+                    queue.load();
+                    break;
             }
         });
     });

@@ -50,10 +50,10 @@ if (app.Environment.IsDevelopment())
 // Serve static files from wwwroot
 app.UseStaticFiles();
 
-// Fallback to index.html for SPA routing
-app.MapFallbackToFile("index.html");
-
-// API routes
+// API routes - must be BEFORE fallback
 app.MapControllers();
+
+// Fallback to index.html for SPA routing (only for non-API routes)
+app.MapFallbackToFile("index.html");
 
 app.Run();

@@ -1,169 +1,127 @@
 # Sonos Sound Hub
 
-A self-hosted web application designed to run on Raspberry Pi for managing your Sonos sound system.
+Self-hosted Sonos control UI and API built for Raspberry Pi. Runs fully offline with a lightweight vanilla JS frontend and an ASP.NET Core backend.
 
-## Overview
+## Quick Start (Raspberry Pi)
 
-This application provides a complete web interface for Sonos management, running entirely locally on your Raspberry Pi with no cloud dependencies.
+Follow these steps on a Raspberry Pi OS 64-bit install (Bullseye/Bookworm):
 
-## Architecture
+1. **Install prerequisites**
+   ```bash
+   sudo apt update
+   sudo apt install -y git curl python3 python3-pip python3-venv pipx
+   pipx ensurepath
+   ```
 
-- **Platform**: Raspberry Pi (ARM-compatible)
-- **Frontend**: Vanilla JavaScript, HTML, CSS
-- **Backend**: ASP.NET Core Web API (.NET 8)
-- **Database**: SQLite (file-based)
-- **Caching**: In-memory caching
-- **Hosting**: Self-hosted on Raspberry Pi using Kestrel
+2. **Install .NET 8 (ARM)**
+   ```bash
+   curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+   chmod +x dotnet-install.sh
+   ./dotnet-install.sh --channel 8.0 --runtime aspnetcore
+   ./dotnet-install.sh --channel 8.0 --runtime dotnet
+   ./dotnet-install.sh --channel 8.0 --quality ga --install-dir "$HOME/.dotnet" --version latest
+   echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.bashrc
+   echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.profile
+   source ~/.profile
+   dotnet --info
+   ```
 
-## Project Structure
+3. **Install soco-cli (Sonos bridge)**
+   ```bash
+   pipx install soco-cli
+   sonos-http-api-server --version
+   ```
 
-```
-.
-├── api/                          # ASP.NET Core Web API
-│   ├── Controllers/             # API controllers
-│   ├── wwwroot/                 # Frontend files (HTML, JS, CSS)
-│   ├── AppDbContext.cs          # Database context
-│   ├── Program.cs               # Application entry point
-│   └── appsettings.json         # Configuration
-├── .devcontainer/               # Dev container configuration
-├── .vscode/                     # VS Code tasks and launch config
-└── TEST_ENVIRONMENT.md          # Test environment documentation
+4. **Clone and run**
+   ```bash
+   git clone https://github.com/danmcpherson/SonosSoundHub.git
+   cd SonosSoundHub/api
+   dotnet restore
+   dotnet run
+   ```
 
-```
+5. **Open the UI**
+   - On the Pi: `http://localhost:5000`
+   - From another device: `http://<pi-hostname-or-ip>:5000`
 
-## Getting Started
+The app auto-starts the soco-cli HTTP API server, discovers speakers, and serves the web UI from `wwwroot/`.
 
-### Prerequisites
+## Why This Project
 
-- Visual Studio Code with Dev Containers extension (for development)
-- Docker Desktop (for dev container)
-- Or: Raspberry Pi with .NET 8 SDK installed (for production)
+- Runs entirely on-device—no cloud, no accounts
+- Optimized for Raspberry Pi and ARM
+- Simple, fail-fast design using .NET 8 + vanilla JS
+- SQLite-backed, file-based data in `data/`
 
-### 1. Open in Dev Container
+## Requirements
 
-**Option A: GitHub Codespaces**
-1. Click "Code" → "Codespaces" → "Create codespace on main"
-2. Wait for the container to build and start
-
-**Option B: Local Dev Container**
-1. Install Docker Desktop and VS Code with Dev Containers extension
-2. Clone the repository
-3. Open in VS Code and click "Reopen in Container"
-
-### 2. Run the Application
-
-```bash
-cd api
-dotnet run
-```
-
-The application will start on `http://localhost:5000` (or the port shown in terminal).
-
-**Using VS Code:**
-- Press `F5` to run with debugging
-- Or use Terminal → Run Task → "run"
-
-### 3. Access the Application
-
-Open your browser and navigate to the URL shown in the terminal (typically `http://localhost:5000` or `http://localhost:8080`).
-2. Click "New repository secret"
-3. Name: `AZURE_STATIC_WEB_APPS_API_TOKEN`
-4. Value: (provided by the setup script)
-
-The GitHub Actions workflow will automatically deploy on every push to `main`.
-
-### 4. Local Development
-
-**Start Azurite (Local Storage Emulator):**
-```bash
-azurite --silent --location .azurite --debug .azurite/debug.log
-```
-
-**Start the Static Web App CLI:**
-```bash
-swa start
-```
-
-This will:
-- Serve the frontend on `http://localhost:4280`
-- Run the .NET API functions
-- Use Azurite for local storage
-
-**Access the application:**
-- Homepage: `http://localhost:4280`
-- Dashboard (authenticated): `http://localhost:4280/app`
-- API: `http://localhost:4280/api/*`
-
-## Features
-
-### Frontend
-
-## Features
-
-- ✅ Self-hosted - runs entirely on your Raspberry Pi
-- ✅ No cloud dependencies - all data stored locally
-- ✅ SQLite database - lightweight and efficient
-- ✅ REST API - standard ASP.NET Core Web API
-- ✅ Vanilla JavaScript frontend - no build step required
-- ✅ ARM-compatible - optimized for Raspberry Pi
-
-## API Endpoints
-
-The test environment includes sample CRUD endpoints at `/api/sample`:
-
-- `GET /api/sample` - Get all items
-- `GET /api/sample/{id}` - Get item by ID
-- `POST /api/sample` - Create new item
-- `PUT /api/sample/{id}` - Update item
-- `DELETE /api/sample/{id}` - Delete item
+- Raspberry Pi 3B+ or newer (64-bit OS recommended)
+- .NET 8 runtime (or SDK for development)
+- Python 3.11+ with `pipx`
+- `soco-cli` for Sonos control
+- Network access to your Sonos speakers (same LAN)
 
 ## Configuration
 
-Edit `api/appsettings.json` to configure:
+Edit `api/appsettings.json` (or `appsettings.Development.json`) to adjust runtime settings:
 
 ```json
 {
   "ConnectionStrings": {
     "DefaultConnection": "Data Source=data/app.db"
   },
-  "DataDirectory": "data"
+  "DataDirectory": "data",
+  "SocoCli": {
+    "Port": 8000,
+    "MacrosFile": "data/macros.txt",
+    "UseLocalCache": false
+  }
 }
 ```
 
-## Database
+- Database lives under `data/` (gitignored). Created automatically on first run.
+- Adjust `SocoCli:Port` if 8000 is in use.
+- Set `ASPNETCORE_ENVIRONMENT=Development` for verbose errors while developing.
 
-SQLite database is automatically created on first run in the `data/` directory. The database file is gitignored.
+## Run Locally (development)
 
-## Deploying to Raspberry Pi
+```bash
+cd api
+dotnet run
+```
 
-1. **Publish the application:**
+- Default URL: `http://localhost:5000`
+- VS Code tasks: `run`, `build`, `clean`, `publish`
+- Hot reload available via `dotnet watch run` (optional).
+
+## Publish and Deploy to Raspberry Pi (release)
+
+1. Publish on your dev machine (or on the Pi):
    ```bash
    cd api
    dotnet publish -c Release -o ./publish
    ```
 
-2. **Copy to Raspberry Pi:**
+2. Copy the publish folder to the Pi:
    ```bash
-   scp -r publish/ pi@raspberrypi:~/sonos-hub/
+   scp -r api/publish/ pi@<pi-hostname-or-ip>:/home/pi/sonos-sound-hub/
    ```
 
-3. **Run on Raspberry Pi:**
+3. Run on the Pi:
    ```bash
-   cd ~/sonos-hub
+   cd /home/pi/sonos-sound-hub
    dotnet api.dll
    ```
 
-4. **Optional: Set up systemd service**
-   
-   Create `/etc/systemd/system/sonos-hub.service`:
+4. Optional: systemd service for auto-start
    ```ini
    [Unit]
    Description=Sonos Sound Hub
    After=network.target
 
    [Service]
-   WorkingDirectory=/home/pi/sonos-hub
-   ExecStart=/usr/bin/dotnet /home/pi/sonos-hub/api.dll
+   WorkingDirectory=/home/pi/sonos-sound-hub
+   ExecStart=/home/pi/.dotnet/dotnet /home/pi/sonos-sound-hub/api.dll
    Restart=always
    RestartSec=10
    User=pi
@@ -172,30 +130,65 @@ SQLite database is automatically created on first run in the `data/` directory. 
    [Install]
    WantedBy=multi-user.target
    ```
-
-   Enable and start:
    ```bash
-   sudo systemctl enable sonos-hub
-   sudo systemctl start sonos-hub
+   sudo tee /etc/systemd/system/sonos-sound-hub.service >/dev/null <<'EOF'
+   [Unit]
+   Description=Sonos Sound Hub
+   After=network.target
+
+   [Service]
+   WorkingDirectory=/home/pi/sonos-sound-hub
+   ExecStart=/home/pi/.dotnet/dotnet /home/pi/sonos-sound-hub/api.dll
+   Restart=always
+   RestartSec=10
+   User=pi
+   Environment=ASPNETCORE_ENVIRONMENT=Production
+
+   [Install]
+   WantedBy=multi-user.target
+   EOF
+   sudo systemctl enable sonos-sound-hub
+   sudo systemctl start sonos-sound-hub
    ```
 
-## Development Notes
+## Features
 
-- SQLite database: `data/app.db`
-- Static files: `api/wwwroot/`
-- All API responses use camelCase (JavaScript convention)
-- ARM-compatible - ready for Raspberry Pi
+- Sonos discovery and control via `soco-cli`
+- Macro management backed by `data/macros.txt`
+- REST API (ASP.NET Core) with camelCase JSON
+- SQLite storage; zero external services
+- Vanilla JS frontend served from `wwwroot/`
+- ARM-friendly binaries for Raspberry Pi
 
-## Test Environment
+## Project Structure
 
-See `TEST_ENVIRONMENT.md` for details about the included test environment with sample data and UI.
+```
+.
+├── api/                      # ASP.NET Core Web API + frontend
+│   ├── Controllers/          # API endpoints
+│   ├── Services/             # Sonos + macro services
+│   ├── Models/               # DTOs and EF models
+│   ├── wwwroot/              # HTML, JS, CSS
+│   ├── data/                 # SQLite DB and macros.txt (gitignored)
+│   ├── Program.cs            # Entry point
+│   └── appsettings*.json     # Configuration
+├── SETUP.md                  # soco-cli and tooling setup
+├── TEST_ENVIRONMENT.md       # Sample endpoints and UI
+└── README.md
+```
 
-## Next Steps
+## Development Tips
 
-1. Build your Sonos integration features
-2. Add new API controllers in `api/Controllers/`
-3. Create database models and add to `AppDbContext`
-4. Extend the frontend in `api/wwwroot/`
+- Keep `soco-cli` running on the same host; the app launches it automatically.
+- If ports conflict, change `SocoCli:Port` and the app port via `ASPNETCORE_URLS` (example: `http://0.0.0.0:5002`).
+- For debugging in VS Code, use the included tasks/launch config.
+
+## Troubleshooting
+
+- **Port in use (5000 or 8000):** `lsof -i :5000` or `lsof -i :8000`, then stop the conflicting process or change the port in config.
+- **Speakers not discovered:** ensure the Pi is on the same LAN as Sonos, power-cycle a speaker, or run `sonos-discover`.
+- **Permission errors with pipx:** rerun `pipx install soco-cli --force`.
+- **Database issues:** delete `api/data/app.db` to regenerate (data loss) or confirm `DataDirectory` points to a writable path.
 
 ## License
 

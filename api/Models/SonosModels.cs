@@ -95,3 +95,32 @@ public class TrackInfo
     public string? Duration { get; set; }
     public string? Position { get; set; }
 }
+
+/// <summary>
+/// Represents a numbered list item (favorites, playlists)
+/// </summary>
+public class ListItem
+{
+    public int Number { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Represents a queue item with full track info
+/// </summary>
+public class QueueItem
+{
+    public int Number { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Artist { get; set; } = string.Empty;
+    public string Album { get; set; } = string.Empty;
+    public bool IsCurrent { get; set; }
+}
+
+/// <summary>
+/// Request to add a share link to the queue
+/// </summary>
+public class ShareLinkRequest
+{
+    public string Url { get; set; } = string.Empty;
+}
