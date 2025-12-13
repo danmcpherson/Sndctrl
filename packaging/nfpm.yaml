@@ -11,9 +11,9 @@ depends:
   - python3
   - pipx
 contents:
-  - src: "publish/$RID/"
+  - src: "publish/$RID/**"
     dst: /opt/sonos-sound-hub
-    type: dir
+    type: file
   - src: /opt/sonos-sound-hub/api
     dst: /usr/local/bin/sonos-sound-hub
     type: symlink
