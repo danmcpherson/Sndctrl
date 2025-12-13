@@ -1,10 +1,25 @@
 # Sonos Sound Hub
 
-Self-hosted Sonos control UI and API built for Raspberry Pi. Runs fully offline with a lightweight vanilla JS frontend and an ASP.NET Core backend.
+Self-hosted Sonos control UI and API built for Raspberry Pi. A thin web layer over the fantastic [soco-cli](https://github.com/avantrec/soco-cli) library. Runs fully offline with a lightweight vanilla JS frontend and an ASP.NET Core backend.
 
 ## Quick Start (Raspberry Pi)
 
-Follow these steps on a Raspberry Pi OS 64-bit install (Bullseye/Bookworm):
+### Easiest: install via APT (self-contained binary)
+
+```bash
+curl -fsSL https://danmcpherson.github.io/SonosSoundHub/KEY.gpg | sudo gpg --dearmor -o /usr/share/keyrings/sonos-sound-hub.gpg
+ARCH=$(dpkg --print-architecture)
+echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/sonos-sound-hub.gpg] https://danmcpherson.github.io/SonosSoundHub stable main" | sudo tee /etc/apt/sources.list.d/sonos-sound-hub.list
+sudo apt-get update
+sudo apt-get install sonos-sound-hub
+# Install soco-cli: see https://github.com/avantrec/soco-cli for installation instructions
+sonos-sound-hub
+```
+- The script auto-detects `dpkg --print-architecture` (arm64 or armhf) and uses the matching repo build.
+- Binary is self-contained; no .NET runtime needed.
+- Install [soco-cli](https://github.com/avantrec/soco-cli) separately (required dependency).
+
+### Manual install (clone & run)
 
 1. **Install prerequisites**
    ```bash
@@ -13,23 +28,10 @@ Follow these steps on a Raspberry Pi OS 64-bit install (Bullseye/Bookworm):
    pipx ensurepath
    ```
 
-2. **Install .NET 8 (ARM)**
-   ```bash
-   curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
-   chmod +x dotnet-install.sh
-   ./dotnet-install.sh --channel 8.0 --runtime aspnetcore
-   ./dotnet-install.sh --channel 8.0 --runtime dotnet
-   ./dotnet-install.sh --channel 8.0 --quality ga --install-dir "$HOME/.dotnet" --version latest
-   echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.bashrc
-   echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.profile
-   source ~/.profile
-   dotnet --info
-   ```
+2. **Install soco-cli**
+   - Follow the installation instructions at https://github.com/avantrec/soco-cli
 
-3. **Install soco-cli (Sonos bridge)**
-   - Prerequisite; follow the official installation guidance at https://github.com/avantrec/soco-cli.
-
-4. **Clone and run**
+3. **Clone and run**
    ```bash
    git clone https://github.com/danmcpherson/SonosSoundHub.git
    cd SonosSoundHub/api
@@ -37,13 +39,13 @@ Follow these steps on a Raspberry Pi OS 64-bit install (Bullseye/Bookworm):
    dotnet run
    ```
 
-### Install from a release artifact (easiest on Pi)
+### Install from a release artifact (tarball)
 
 1. Grab the latest tarball from GitHub Releases (choose `linux-arm64` for 64-bit Pi OS, `linux-arm` for 32-bit).
    ```bash
    curl -LO https://github.com/danmcpherson/SonosSoundHub/releases/latest/download/sonos-sound-hub-linux-arm64.tar.gz
    ```
-2. Extract and run (assumes .NET 8 runtime and soco-cli are already installed):
+2. Extract and run ([soco-cli](https://github.com/avantrec/soco-cli) still required):
    ```bash
    mkdir -p ~/sonos-sound-hub
    tar -xzf sonos-sound-hub-linux-arm64.tar.gz -C ~/sonos-sound-hub
@@ -51,25 +53,34 @@ Follow these steps on a Raspberry Pi OS 64-bit install (Bullseye/Bookworm):
    ./api
    ```
 
-5. **Open the UI**
-   - On the Pi: `http://localhost:5000`
-   - From another device: `http://<pi-hostname-or-ip>:5000`
+**Open the UI**
+- On the Pi: `http://localhost:5000`
+- From another device: `http://<pi-ip-or-hostname>:5000`
 
-The app auto-starts the soco-cli HTTP API server, discovers speakers, and serves the web UI from `wwwroot/`.
+The app listens on all network interfaces (0.0.0.0:5000), auto-starts the soco-cli HTTP API server, discovers speakers, and serves the web UI.
 
 ## Why This Project
 
 - Runs entirely on-device—no cloud, no accounts
-- Optimized for Raspberry Pi and ARM
+- One-line APT install with automated updates via GitHub Actions
+- Self-contained binary (no .NET runtime required)
+- Optimized for Raspberry Pi ARM (armhf and arm64)
 - Simple, fail-fast design using .NET 8 + vanilla JS
 - SQLite-backed, file-based data in `data/`
 
 ## Requirements
 
-- Raspberry Pi 3B+ or newer (64-bit OS recommended)
-- .NET 8 runtime (or SDK for development)
+### For APT Install (Recommended)
+- Raspberry Pi 3B+ or newer (works on 32-bit or 64-bit Pi OS)
 - Python 3.11+ with `pipx`
-- `soco-cli` for Sonos control
+- [soco-cli](https://github.com/avantrec/soco-cli) for Sonos control
+- Network access to your Sonos speakers (same LAN)
+
+### For Development
+- Raspberry Pi 3B+ or newer (64-bit OS recommended)
+- .NET 8 SDK
+- Python 3.11+ with `pipx`
+- [soco-cli](https://github.com/avantrec/soco-cli) for Sonos control
 - Network access to your Sonos speakers (same LAN)
 
 ## Configuration
@@ -164,12 +175,14 @@ dotnet run
 
 ## Features
 
-- Sonos discovery and control via `soco-cli`
-- Macro management backed by `data/macros.txt`
-- REST API (ASP.NET Core) with camelCase JSON
-- SQLite storage; zero external services
-- Vanilla JS frontend served from `wwwroot/`
-- ARM-friendly binaries for Raspberry Pi
+- **One-line APT install** with signed repository and automated releases
+- **Self-contained deployment** (no .NET runtime dependency)
+- **Sonos discovery and control** via [soco-cli](https://github.com/avantrec/soco-cli)
+- **Macro management** backed by `data/macros.txt`
+- **REST API** (ASP.NET Core) with camelCase JSON
+- **SQLite storage** - zero external services
+- **Vanilla JS frontend** served from `wwwroot/`
+- **ARM-optimized** single-file binaries for armhf and arm64
 
 ## Project Structure
 
@@ -196,10 +209,13 @@ dotnet run
 
 ## Troubleshooting
 
+- **APT key errors:** Ensure you've run the full install script including the `gpg --dearmor` step. If you see NO_PUBKEY errors, re-add the key.
+- **Package not found:** Run `sudo apt-get update` and verify your architecture matches (armhf for 32-bit, arm64 for 64-bit). Check with `dpkg --print-architecture`.
+- **Binary not found after install:** The symlink should be at `/usr/local/bin/sonos-sound-hub`. Run `hash -r` to refresh your shell's command cache.
 - **Port in use (5000 or 8000):** `lsof -i :5000` or `lsof -i :8000`, then stop the conflicting process or change the port in config.
 - **Speakers not discovered:** ensure the Pi is on the same LAN as Sonos, power-cycle a speaker, or run `sonos-discover`.
 - **Refresh cached speaker list:** if `SocoCli:UseLocalCache` is enabled, use the **Rediscover** button in the UI to run `/rediscover` (this overwrites the local speaker cache file and replaces the cached list).
-- **Permission errors with pipx:** check the soco-cli installation notes for your platform.
+- **soco-cli not found:** Follow the installation guide at https://github.com/avantrec/soco-cli.
 - **Database issues:** delete `api/data/app.db` to regenerate (data loss) or confirm `DataDirectory` points to a writable path.
 
 ## License
