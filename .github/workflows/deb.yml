@@ -121,15 +121,15 @@ jobs:
       - name: Build Release file
         working-directory: repo
         run: |
-          cat > dists/stable/Release <<'EOF'
-Origin: Sonos Sound Hub
-Label: Sonos Sound Hub
-Suite: stable
-Codename: stable
-Architectures: armhf arm64
-Components: main
-Description: Sonos Sound Hub APT repo
-EOF
+          cat <<'EOF' > dists/stable/Release
+          Origin: Sonos Sound Hub
+          Label: Sonos Sound Hub
+          Suite: stable
+          Codename: stable
+          Architectures: armhf arm64
+          Components: main
+          Description: Sonos Sound Hub APT repo
+          EOF
           apt-ftparchive release dists/stable >> dists/stable/Release
 
       - name: Sign repo (optional)
