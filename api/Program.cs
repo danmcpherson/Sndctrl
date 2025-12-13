@@ -3,6 +3,9 @@ using SonosSoundHub.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Listen on all interfaces for Pi deployment
+builder.WebHost.UseUrls("http://0.0.0.0:5000");
+
 // Add services
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
