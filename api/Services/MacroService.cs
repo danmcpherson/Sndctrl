@@ -29,8 +29,9 @@ public class MacroService
         _httpClient = httpClient;
 
         var dataDir = _configuration.GetValue<string>("DataDirectory") ?? "data";
-        _macrosFilePath = Path.Combine(dataDir, "macros.txt");
-        _metadataFilePath = Path.Combine(dataDir, "macros-metadata.json");
+        // Convert to absolute path to ensure consistency with soco-cli server
+        _macrosFilePath = Path.GetFullPath(Path.Combine(dataDir, "macros.txt"));
+        _metadataFilePath = Path.GetFullPath(Path.Combine(dataDir, "macros-metadata.json"));
 
         EnsureMacrosFileExists();
     }
@@ -40,6 +41,14 @@ public class MacroService
     /// </summary>
     private void EnsureMacrosFileExists()
     {
+        // Ensure directory exists
+        var directory = Path.GetDirectoryName(_macrosFilePath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+            _logger.LogInformation("Created data directory: {Directory}", directory);
+        }
+
         if (!File.Exists(_macrosFilePath))
         {
             var defaultContent = @"# SonosSoundHub Macros

@@ -117,7 +117,10 @@ public class SocoCliService
             
             if (!string.IsNullOrEmpty(macrosFile))
             {
-                arguments += $" --macros {macrosFile}";
+                // Convert to absolute path to ensure soco-cli uses the same file as MacroService
+                var absoluteMacrosPath = Path.GetFullPath(macrosFile);
+                arguments += $" --macros \"{absoluteMacrosPath}\"";
+                _logger.LogInformation("Using macros file: {MacrosPath}", absoluteMacrosPath);
             }
 
             if (useLocalCache)
