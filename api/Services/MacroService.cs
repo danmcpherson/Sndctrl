@@ -140,12 +140,37 @@ public class MacroService
     }
 
     /// <summary>
+    /// Cleans share links by removing Apple Music query parameters
+    /// </summary>
+    private string CleanShareLinks(string definition)
+    {
+        if (string.IsNullOrWhiteSpace(definition))
+        {
+            return definition;
+        }
+
+        // Remove ?i= parameter from Apple Music URLs (track-specific parameter)
+        // Example: https://music.apple.com/au/album/...?i=123456 -> https://music.apple.com/au/album/...
+        var cleaned = Regex.Replace(
+            definition,
+            @"(https://music\.apple\.com/[^\s:]+)\?i=[0-9]+",
+            "$1",
+            RegexOptions.IgnoreCase
+        );
+
+        return cleaned;
+    }
+
+    /// <summary>
     /// Saves or updates a macro
     /// </summary>
     public async Task<bool> SaveMacroAsync(Macro macro)
     {
         try
         {
+            // Clean share links in the definition
+            macro.Definition = CleanShareLinks(macro.Definition);
+
             var macros = await GetAllMacrosAsync();
             var existing = macros.FirstOrDefault(m => m.Name.Equals(macro.Name, StringComparison.OrdinalIgnoreCase));
 
@@ -237,6 +262,60 @@ public class MacroService
         {
             _logger.LogError(ex, "Failed to delete macro: {Name}", name);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Duplicates a macro with a new name
+    /// </summary>
+    public async Task<Macro?> DuplicateMacroAsync(string sourceName)
+    {
+        try
+        {
+            var sourceMacro = await GetMacroAsync(sourceName);
+            if (sourceMacro == null)
+            {
+                _logger.LogWarning("Source macro not found: {Name}", sourceName);
+                return null;
+            }
+
+            // Generate a unique name for the duplicate
+            var macros = await GetAllMacrosAsync();
+            var baseName = $"{sourceName}_copy";
+            var newName = baseName;
+            var counter = 1;
+
+            while (macros.Any(m => m.Name.Equals(newName, StringComparison.OrdinalIgnoreCase)))
+            {
+                counter++;
+                newName = $"{baseName}_{counter}";
+            }
+
+            // Create the duplicate macro
+            var duplicateMacro = new Macro
+            {
+                Name = newName,
+                Definition = sourceMacro.Definition,
+                Description = sourceMacro.Description,
+                Category = sourceMacro.Category,
+                IsFavorite = false, // Don't duplicate favorite status
+                Parameters = sourceMacro.Parameters
+            };
+
+            // Save the duplicate
+            var result = await SaveMacroAsync(duplicateMacro);
+            if (result)
+            {
+                _logger.LogInformation("Duplicated macro: {Source} -> {Duplicate}", sourceName, newName);
+                return duplicateMacro;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to duplicate macro: {Name}", sourceName);
+            return null;
         }
     }
 
@@ -333,7 +412,22 @@ public class MacroService
         {
             var json = await File.ReadAllTextAsync(_metadataFilePath);
             var macros = JsonSerializer.Deserialize<List<Macro>>(json) ?? new List<Macro>();
-            return macros.ToDictionary(m => m.Name, StringComparer.OrdinalIgnoreCase);
+            
+            // Filter out invalid macros and handle duplicates
+            var validMacros = macros
+                .Where(m => !string.IsNullOrWhiteSpace(m.Name))
+                .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First()) // Take first if duplicates exist
+                .ToDictionary(m => m.Name, StringComparer.OrdinalIgnoreCase);
+            
+            // Log if we found issues
+            var invalidCount = macros.Count - validMacros.Count;
+            if (invalidCount > 0)
+            {
+                _logger.LogWarning("Found {Count} invalid or duplicate macro entries in metadata", invalidCount);
+            }
+            
+            return validMacros;
         }
         catch (Exception ex)
         {

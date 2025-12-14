@@ -88,12 +88,59 @@ function setupEventListeners() {
         macros.showImportDialog();
     });
 
+    // Macros file info button
+    const macrosInfoBtn = document.getElementById('macros-file-info-btn');
+    if (macrosInfoBtn) {
+        macrosInfoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            macros.toggleFileInfo();
+        });
+    }
+
+    // Copy file path button
+    const copyPathBtn = document.getElementById('copy-file-path-btn');
+    if (copyPathBtn) {
+        copyPathBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            macros.copyFilePath();
+        });
+    }
+
+    // Close tooltip when clicking outside
+    document.addEventListener('click', (e) => {
+        const tooltip = document.getElementById('macros-file-tooltip');
+        const infoBtn = document.getElementById('macros-file-info-btn');
+        if (tooltip && infoBtn && !tooltip.contains(e.target) && !infoBtn.contains(e.target)) {
+            tooltip.style.display = 'none';
+        }
+    });
+
     // Import file input change handler
     document.getElementById('import-file-input').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) {
             await macros.handleImportFile(file);
             e.target.value = ''; // Reset input so same file can be selected again
+        }
+    });
+
+    // Import modal event listeners
+    document.getElementById('close-import-modal').addEventListener('click', () => {
+        macros.closeImportModal();
+    });
+
+    document.getElementById('import-merge-btn').addEventListener('click', () => {
+        macros.handleImportMerge();
+    });
+
+    document.getElementById('import-replace-btn').addEventListener('click', () => {
+        macros.handleImportReplace();
+    });
+
+    // Close import modal when clicking outside
+    document.getElementById('import-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'import-modal') {
+            macros.closeImportModal();
         }
     });
 
@@ -108,8 +155,12 @@ function setupEventListeners() {
     document.addEventListener('keydown', (e) => {
         // ESC to close modal
         if (e.key === 'Escape') {
-            const modal = document.getElementById('macro-editor-modal');
-            if (modal.classList.contains('active')) {
+            const macroModal = document.getElementById('macro-editor-modal');
+            const importModal = document.getElementById('import-modal');
+            
+            if (importModal.classList.contains('active')) {
+                macros.closeImportModal();
+            } else if (macroModal.classList.contains('active')) {
                 toggleMacroModal(false);
             }
         }

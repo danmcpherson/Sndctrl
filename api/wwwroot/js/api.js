@@ -130,6 +130,12 @@ class ApiClient {
         });
     }
 
+    async setGroupVolume(speakerName, volume) {
+        return this.request(`/api/sonos/speakers/${encodeURIComponent(speakerName)}/group-volume/${volume}`, {
+            method: 'POST'
+        });
+    }
+
     async transferPlayback(speakerName, targetSpeaker) {
         return this.request(`/api/sonos/speakers/${encodeURIComponent(speakerName)}/transfer/${encodeURIComponent(targetSpeaker)}`, {
             method: 'POST'
@@ -310,6 +316,12 @@ class ApiClient {
     async deleteMacro(name) {
         return this.request(`/api/macro/${encodeURIComponent(name)}`, {
             method: 'DELETE'
+        });
+    }
+
+    async duplicateMacro(name) {
+        return this.request(`/api/macro/${encodeURIComponent(name)}/duplicate`, {
+            method: 'POST'
         });
     }
 

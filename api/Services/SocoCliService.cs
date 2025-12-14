@@ -248,6 +248,32 @@ public class SocoCliService
             return true;
         }
 
+        // If server is currently starting, wait for it
+        if (_isStarting)
+        {
+            _logger.LogDebug("Server is starting, waiting for completion...");
+            
+            // Wait for the startup to complete (up to 15 seconds)
+            for (int i = 0; i < 150; i++)
+            {
+                await Task.Delay(100);
+                if (IsRunning())
+                {
+                    return true;
+                }
+                if (!_isStarting)
+                {
+                    // Startup finished but server not running - failed to start
+                    break;
+                }
+            }
+            
+            if (IsRunning())
+            {
+                return true;
+            }
+        }
+
         // Check if another instance is already responding on the port
         // (e.g., from a previous run that we lost track of)
         try

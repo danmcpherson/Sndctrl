@@ -103,6 +103,15 @@ function createSpeakerCard(speakerName) {
             </button>
         </div>
         
+        <div class="volume-control group-volume-control" style="display: none;">
+            <div class="volume-label">
+                <span>🔊 Group Volume</span>
+                <span class="group-volume-value">--</span>
+            </div>
+            <input type="range" class="group-volume-slider" min="0" max="100" value="50" 
+                   oninput="speakers.setGroupVolume('${speakerName}', this.value)">
+        </div>
+        
         <div class="volume-control">
             <div class="volume-label">
                 <span>Volume</span>
@@ -140,8 +149,16 @@ function createMacroCard(macro) {
     
     card.innerHTML = `
         <div class="macro-header">
-            <h3 class="macro-name">${macro.name}</h3>
-            ${categoryHtml}
+            <div class="macro-header-content">
+                <h3 class="macro-name">${macro.name}</h3>
+                ${categoryHtml}
+            </div>
+            <button class="macro-copy-btn" onclick="macros.copyUrl('${macro.name}')" title="Copy Macro Run Url">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+            </button>
         </div>
         ${descriptionHtml}
         ${parametersInfo}
@@ -152,6 +169,9 @@ function createMacroCard(macro) {
             </button>
             <button class="btn btn-secondary btn-sm" onclick="macros.edit('${macro.name}')">
                 Edit
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="macros.duplicate('${macro.name}')">
+                Duplicate
             </button>
             <button class="btn btn-secondary btn-sm" onclick="macros.delete('${macro.name}')">
                 Delete
@@ -172,6 +192,53 @@ function toggleMacroModal(show) {
     } else {
         modal.classList.remove('active');
     }
+}
+
+/**
+ * Shows a confirmation modal and returns a promise
+ * @param {string} message - The confirmation message
+ * @param {string} title - The modal title (optional)
+ * @param {string} confirmText - The confirm button text (optional)
+ * @returns {Promise<boolean>} True if confirmed, false if cancelled
+ */
+function showConfirmModal(message, title = 'Confirm Action', confirmText = 'Confirm') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal');
+        const titleEl = document.getElementById('confirm-modal-title');
+        const messageEl = document.getElementById('confirm-modal-message');
+        const confirmBtn = document.getElementById('confirm-modal-confirm-btn');
+        
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        confirmBtn.textContent = confirmText;
+        
+        // Show modal
+        modal.classList.add('active');
+        
+        // Handle confirm
+        const handleConfirm = () => {
+            cleanup();
+            resolve(true);
+        };
+        
+        // Handle cancel
+        const handleCancel = () => {
+            cleanup();
+            resolve(false);
+        };
+        
+        // Cleanup function
+        const cleanup = () => {
+            modal.classList.remove('active');
+            confirmBtn.removeEventListener('click', handleConfirm);
+        };
+        
+        // Set up event listeners
+        confirmBtn.addEventListener('click', handleConfirm);
+        
+        // Store cancel handler globally so it can be called from onclick
+        window.hideConfirmModal = handleCancel;
+    });
 }
 
 /**
@@ -247,4 +314,236 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
+}
+
+/**
+ * Custom Searchable Dropdown Component
+ */
+class SearchableDropdown {
+    constructor(containerId, options = [], config = {}) {
+        this.container = document.getElementById(containerId);
+        if (!this.container) return;
+        
+        this.options = options;
+        this.value = null;
+        this.onChange = null;
+        this.placeholder = 'Select option...';
+        this.allowCustom = config.allowCustom || false;
+        
+        this.render();
+        this.attachEvents();
+    }
+    
+    setOptions(options) {
+        this.options = options;
+        this.renderOptions();
+    }
+    
+    setValue(value) {
+        this.value = value;
+        this.updateTrigger();
+        this.updateSelectedOption();
+    }
+    
+    getValue() {
+        return this.value;
+    }
+    
+    render() {
+        this.container.classList.add('custom-select-container');
+        const searchPlaceholder = this.allowCustom ? 'Search or type custom value...' : 'Search...';
+        this.container.innerHTML = `
+            <div class="custom-select-trigger" tabindex="0">
+                <span>${this.placeholder}</span>
+            </div>
+            <div class="custom-select-dropdown">
+                <div class="custom-select-search">
+                    <input type="text" placeholder="${searchPlaceholder}">
+                </div>
+                <div class="custom-select-options"></div>
+            </div>
+        `;
+        
+        this.trigger = this.container.querySelector('.custom-select-trigger');
+        this.dropdown = this.container.querySelector('.custom-select-dropdown');
+        this.searchInput = this.container.querySelector('input');
+        this.optionsContainer = this.container.querySelector('.custom-select-options');
+        
+        this.renderOptions();
+    }
+    
+    renderOptions() {
+        if (this.options.length === 0) {
+            this.optionsContainer.innerHTML = '<div class="custom-select-empty">No options available</div>';
+            return;
+        }
+        
+        this.optionsContainer.innerHTML = this.options.map(opt => `
+            <div class="custom-select-option" data-value="${opt.value}">
+                ${opt.label}
+            </div>
+        `).join('');
+        
+        this.updateSelectedOption();
+    }
+    
+    updateTrigger() {
+        const selectedOption = this.options.find(o => o.value === this.value);
+        const span = this.trigger.querySelector('span');
+        if (selectedOption) {
+            span.textContent = selectedOption.label;
+            span.style.color = 'var(--color-gray-900)';
+        } else if (this.value) {
+            // Display value even if not in options (for custom values)
+            span.textContent = this.value;
+            span.style.color = 'var(--color-gray-900)';
+        } else {
+            span.textContent = this.placeholder;
+            span.style.color = 'var(--color-gray-500)';
+        }
+    }
+    
+    updateSelectedOption() {
+        const options = this.optionsContainer.querySelectorAll('.custom-select-option');
+        options.forEach(opt => {
+            if (opt.dataset.value === this.value) {
+                opt.classList.add('selected');
+            } else {
+                opt.classList.remove('selected');
+            }
+        });
+    }
+    
+    attachEvents() {
+        // Toggle dropdown
+        this.trigger.addEventListener('click', () => {
+            this.toggleDropdown();
+        });
+        
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!this.container.contains(e.target)) {
+                this.closeDropdown();
+            }
+        });
+        
+        // Search filter
+        this.searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const options = this.optionsContainer.querySelectorAll('.custom-select-option:not(.custom-select-option-custom)');
+            let hasVisible = false;
+            
+            options.forEach(opt => {
+                const text = opt.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    opt.classList.remove('hidden');
+                    hasVisible = true;
+                } else {
+                    opt.classList.add('hidden');
+                }
+            });
+
+            // Handle custom value option
+            if (this.allowCustom) {
+                let customOption = this.optionsContainer.querySelector('.custom-select-option-custom');
+                
+                if (term) {
+                    // Show custom option whenever user is typing (unless exact match exists)
+                    const visibleOpts = Array.from(options).filter(opt => !opt.classList.contains('hidden'));
+                    const exactMatch = visibleOpts.some(opt => opt.textContent.toLowerCase() === term);
+                    
+                    if (!exactMatch) {
+                        if (!customOption) {
+                            customOption = document.createElement('div');
+                            customOption.className = 'custom-select-option custom-select-option-custom';
+                            this.optionsContainer.prepend(customOption);
+                        }
+                        customOption.innerHTML = `<span style="font-weight: 600;">✨ Use custom value:</span> "${e.target.value}"`;
+                        customOption.dataset.value = e.target.value;
+                        customOption.classList.remove('hidden');
+                        hasVisible = true;
+                    } else if (customOption) {
+                        customOption.remove();
+                    }
+                } else if (customOption) {
+                    customOption.remove();
+                }
+            }
+            
+            let emptyMsg = this.optionsContainer.querySelector('.custom-select-empty');
+            if (!hasVisible) {
+                if (!emptyMsg) {
+                    emptyMsg = document.createElement('div');
+                    emptyMsg.className = 'custom-select-empty';
+                    emptyMsg.textContent = 'No matches found';
+                    this.optionsContainer.appendChild(emptyMsg);
+                }
+            } else if (emptyMsg) {
+                emptyMsg.remove();
+            }
+        });
+        
+        // Select option
+        this.optionsContainer.addEventListener('click', (e) => {
+            const option = e.target.closest('.custom-select-option');
+            if (option) {
+                const value = option.dataset.value;
+                this.setValue(value);
+                this.closeDropdown();
+                if (this.onChange) {
+                    this.onChange(value);
+                }
+            }
+        });
+
+        // Handle Enter key in search input
+        this.searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const customOption = this.optionsContainer.querySelector('.custom-select-option-custom');
+                const visibleOptions = Array.from(this.optionsContainer.querySelectorAll('.custom-select-option:not(.hidden):not(.custom-select-option-custom)'));
+                
+                if (visibleOptions.length === 1) {
+                    // Select the single visible option
+                    const value = visibleOptions[0].dataset.value;
+                    this.setValue(value);
+                    this.closeDropdown();
+                    if (this.onChange) this.onChange(value);
+                } else if (customOption && !customOption.classList.contains('hidden')) {
+                    // Select custom option
+                    const value = customOption.dataset.value;
+                    this.setValue(value);
+                    this.closeDropdown();
+                    if (this.onChange) this.onChange(value);
+                }
+            }
+        });
+    }
+    
+    toggleDropdown() {
+        const isOpen = this.dropdown.classList.contains('open');
+        if (isOpen) {
+            this.closeDropdown();
+        } else {
+            this.openDropdown();
+        }
+    }
+    
+    openDropdown() {
+        this.dropdown.classList.add('open');
+        this.trigger.classList.add('active');
+        this.searchInput.value = '';
+        this.searchInput.focus();
+        
+        // Reset filter
+        const options = this.optionsContainer.querySelectorAll('.custom-select-option');
+        options.forEach(opt => opt.classList.remove('hidden'));
+        const emptyMsg = this.optionsContainer.querySelector('.custom-select-empty');
+        if (emptyMsg && this.options.length > 0) emptyMsg.remove();
+    }
+    
+    closeDropdown() {
+        this.dropdown.classList.remove('open');
+        this.trigger.classList.remove('active');
+    }
 }

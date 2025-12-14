@@ -251,6 +251,16 @@ public class SonosController : ControllerBase
     }
 
     /// <summary>
+    /// Sets the volume for all speakers in a group
+    /// </summary>
+    [HttpPost("speakers/{speakerName}/group-volume/{volume}")]
+    public async Task<ActionResult<SocoCliResponse>> SetGroupVolume(string speakerName, int volume)
+    {
+        var result = await _commandService.ExecuteCommandAsync(speakerName, "group_volume", volume.ToString());
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Transfers playback to another speaker
     /// </summary>
     [HttpPost("speakers/{speakerName}/transfer/{targetSpeaker}")]

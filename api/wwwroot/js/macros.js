@@ -5,6 +5,7 @@ window.macros = {
     currentMacros: [],
     editingMacro: null,
     actions: [], // Current actions in the builder
+    dropdowns: {}, // Store dropdown instances
 
     // Available commands organized by category with their argument configurations
     commandCategories: {
@@ -64,11 +65,11 @@ window.macros = {
             play_mode: { label: 'Play Mode', args: [{ name: 'mode', type: 'select', options: ['NORMAL', 'REPEAT_ONE', 'REPEAT_ALL', 'SHUFFLE', 'SHUFFLE_REPEAT_ONE', 'SHUFFLE_NOREPEAT'] }] },
         },
         'Groups': {
-            group: { label: 'Join Group', args: [{ name: 'speaker', type: 'text', placeholder: 'Coordinator speaker' }] },
+            group: { label: 'Join Group', args: [{ name: 'speaker', type: 'text', placeholder: 'Coordinator speaker', quoted: true }] },
             ungroup: { label: 'Leave Group', args: [] },
             party_mode: { label: 'Party Mode (Group All)', args: [] },
             ungroup_all: { label: 'Ungroup All', args: [] },
-            transfer_playback: { label: 'Transfer Playback', args: [{ name: 'speaker', type: 'text', placeholder: 'Target speaker' }] },
+            transfer_playback: { label: 'Transfer Playback', args: [{ name: 'speaker', type: 'text', placeholder: 'Target speaker', quoted: true }] },
         },
         'Sleep & Timers': {
             sleep: { label: 'Sleep Timer', args: [{ name: 'duration', type: 'text', placeholder: '15m, 1h, or off' }] },
@@ -103,15 +104,39 @@ window.macros = {
             const response = await fetch(`${api.baseUrl}/api/macro/info`);
             if (response.ok) {
                 const info = await response.json();
-                const fileInfoDiv = document.getElementById('macros-file-info');
                 const filePathSpan = document.getElementById('macros-file-path');
-                if (fileInfoDiv && filePathSpan && info.filePath) {
+                if (filePathSpan && info.filePath) {
                     filePathSpan.textContent = info.filePath;
-                    fileInfoDiv.style.display = 'block';
                 }
             }
         } catch (error) {
             console.error('Failed to load macros file info:', error);
+        }
+    },
+
+    /**
+     * Toggles file info tooltip
+     */
+    toggleFileInfo() {
+        const tooltip = document.getElementById('macros-file-tooltip');
+        if (tooltip) {
+            const isVisible = tooltip.style.display !== 'none';
+            tooltip.style.display = isVisible ? 'none' : 'block';
+        }
+    },
+
+    /**
+     * Copies file path to clipboard
+     */
+    async copyFilePath() {
+        const filePathSpan = document.getElementById('macros-file-path');
+        if (filePathSpan && filePathSpan.textContent) {
+            try {
+                await navigator.clipboard.writeText(filePathSpan.textContent);
+                showToast('File path copied to clipboard', 'success');
+            } catch (error) {
+                showToast('Failed to copy file path', 'error');
+            }
         }
     },
 
@@ -217,7 +242,11 @@ window.macros = {
         if (!definition) return [];
         
         const actions = [];
-        const parts = definition.split(':').map(p => p.trim()).filter(p => p);
+        // Split only on colon delimiters surrounded by whitespace to avoid breaking URLs (e.g., https://)
+        const parts = definition
+            .split(/\s+:\s+/)
+            .map(p => p.trim())
+            .filter(p => p);
         
         for (const part of parts) {
             // Match: speaker command [args...]
@@ -258,6 +287,20 @@ window.macros = {
     },
 
     /**
+     * Syncs from the raw definition textarea back into the visual builder
+     */
+    syncFromDefinition() {
+        const definition = document.getElementById('macro-definition').value;
+        try {
+            this.actions = this.parseDefinition(definition);
+            this.renderActions();
+        } catch (err) {
+            console.error('Failed to parse macro definition:', err);
+            showToast('Invalid macro definition. Please check formatting.', 'error');
+        }
+    },
+
+    /**
      * Builds definition string from actions array
      */
     buildDefinition() {
@@ -275,10 +318,9 @@ window.macros = {
                     const cmdConfig = this.commands[action.command];
                     const formattedArgs = action.args.map((arg, i) => {
                         if (!arg) return '';
-                        if (cmdConfig && cmdConfig.args[i] && cmdConfig.args[i].quoted && arg) {
-                            return `"${arg}"`;
-                        }
-                        return arg;
+                        const argNeedsQuotes = /\s/.test(arg) && !arg.startsWith('"');
+                        const shouldQuote = (cmdConfig && cmdConfig.args[i] && cmdConfig.args[i].quoted) || argNeedsQuotes;
+                        return shouldQuote ? `"${arg}"` : arg;
                     }).filter(a => a);
                     if (formattedArgs.length > 0) {
                         def += ' ' + formattedArgs.join(' ');
@@ -360,10 +402,30 @@ window.macros = {
         } else if (field.startsWith('arg_')) {
             const argIndex = parseInt(field.split('_')[1]);
             if (!this.actions[index].args) this.actions[index].args = [];
+            // Clean Apple Music URLs when pasting share links
+            if (value && value.includes('music.apple.com')) {
+                value = this.cleanShareLinks(value);
+            }
             this.actions[index].args[argIndex] = value;
         }
         
         this.syncDefinition();
+    },
+
+    /**
+     * Cleans share links by removing Apple Music query parameters
+     * @param {string} definition - The macro definition
+     * @returns {string} The cleaned definition
+     */
+    cleanShareLinks(definition) {
+        if (!definition) return definition;
+        
+        // Remove ?i= parameter from Apple Music URLs (track-specific parameter)
+        // Example: https://music.apple.com/au/album/...?i=123456 -> https://music.apple.com/au/album/...
+        return definition.replace(
+            /(https:\/\/music\.apple\.com\/[^\s:]+)\?i=[0-9]+/gi,
+            '$1'
+        );
     },
 
     /**
@@ -407,16 +469,6 @@ window.macros = {
             '<option value="%5">',
         ].join('');
         
-        // Build categorized command options
-        let commandOptions = '';
-        for (const [category, cmds] of Object.entries(this.commandCategories)) {
-            commandOptions += `<optgroup label="${category}">`;
-            for (const [key, cmd] of Object.entries(cmds)) {
-                commandOptions += `<option value="${key}">${cmd.label}</option>`;
-            }
-            commandOptions += '</optgroup>';
-        }
-
         const noSpeakerCommands = this.getNoSpeakerCommands();
 
         container.innerHTML = this.actions.map((action, index) => {
@@ -431,38 +483,31 @@ window.macros = {
                     const optionalClass = argDef.optional ? 'optional' : '';
                     const argListId = `arg-list-${index}-${argIndex}`;
                     
-                    if (argDef.type === 'select') {
-                        const options = argDef.options.map(opt => 
-                            `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`
-                        ).join('');
-                        return `
-                            <select class="form-control action-arg ${optionalClass}" 
-                                    onchange="macros.updateAction(${index}, 'arg_${argIndex}', this.value)"
-                                    title="${argDef.name}">
-                                <option value="">Select...</option>
-                                ${options}
-                            </select>
-                        `;
-                    } else if (argDef.type === 'number') {
-                        // Use text type to allow %N parameters, but keep number placeholder
+                    // Determine if this argument should include speaker options
+                    const isSpeakerArg = argDef.name === 'speaker' || 
+                                        (argDef.placeholder?.toLowerCase().includes('speaker') && 
+                                         !argDef.placeholder?.toLowerCase().includes('url'));
+                    
+                    // Check if this is a URL/URI field (don't show datalist for these)
+                    const isUrlField = argDef.name?.toLowerCase().includes('url') || 
+                                      argDef.name?.toLowerCase().includes('uri') ||
+                                      argDef.placeholder?.toLowerCase().includes('url') ||
+                                      argDef.placeholder?.toLowerCase().includes('uri');
+                    
+                    const datalistContent = isSpeakerArg ? speakerDatalistOptions : argDatalistOptions;
+                    
+                    if (isUrlField) {
+                        // URL fields don't need a datalist dropdown
                         return `
                             <input type="text" class="form-control action-arg ${optionalClass}" 
                                    value="${value}"
                                    placeholder="${argDef.placeholder || ''}"
-                                   title="${argDef.name} (or use %1, %2, etc.)"
-                                   list="${argListId}"
                                    onchange="macros.updateAction(${index}, 'arg_${argIndex}', this.value)">
-                            <datalist id="${argListId}">${argDatalistOptions}</datalist>
                         `;
                     } else {
+                        // Use SearchableDropdown for everything else (select, speaker, number, text)
                         return `
-                            <input type="text" class="form-control action-arg ${optionalClass}" 
-                                   value="${value}"
-                                   placeholder="${argDef.placeholder || ''}"
-                                   title="${argDef.name} (or use %1, %2, etc.)"
-                                   list="${argListId}"
-                                   onchange="macros.updateAction(${index}, 'arg_${argIndex}', this.value)">
-                            <datalist id="${argListId}">${argDatalistOptions}</datalist>
+                            <div id="action-arg-${index}-${argIndex}" class="action-arg-container ${optionalClass}"></div>
                         `;
                     }
                 }).join('');
@@ -470,15 +515,7 @@ window.macros = {
 
             // Speaker input with datalist (allows typing or selecting, supports quoted names)
             const speakerInput = needsSpeaker || !action.command ? `
-                <input type="text" class="form-control action-speaker" 
-                       value="${action.speaker || ''}"
-                       placeholder="Speaker name..."
-                       list="speaker-list-${index}"
-                       title="Speaker (type or select)"
-                       onchange="macros.updateAction(${index}, 'speaker', this.value)">
-                <datalist id="speaker-list-${index}">
-                    ${speakerDatalistOptions}
-                </datalist>
+                <div id="action-speaker-${index}" class="action-speaker-container"></div>
             ` : '<span class="no-speaker-badge">No speaker needed</span>';
 
             return `
@@ -486,12 +523,7 @@ window.macros = {
                     <div class="action-row-main">
                         <span class="action-number">${index + 1}</span>
                         ${speakerInput}
-                        <select class="form-control action-command" 
-                                onchange="macros.updateAction(${index}, 'command', this.value)"
-                                title="Action">
-                            <option value="">Select action...</option>
-                            ${commandOptions.replace(`value="${action.command}"`, `value="${action.command}" selected`)}
-                        </select>
+                        <div id="action-command-${index}" class="action-command-container"></div>
                         <div class="action-args">
                             ${argsHtml}
                         </div>
@@ -516,6 +548,116 @@ window.macros = {
                 </div>
             `;
         }).join('');
+
+        this.initializeDropdowns();
+    },
+
+    /**
+     * Initializes custom dropdowns for actions
+     */
+    initializeDropdowns() {
+        this.dropdowns = {};
+
+        // Flatten command options for the dropdown
+        const commandOptions = [];
+        for (const [category, cmds] of Object.entries(this.commandCategories)) {
+            for (const [key, cmd] of Object.entries(cmds)) {
+                commandOptions.push({
+                    value: key,
+                    label: `${category}: ${cmd.label}`
+                });
+            }
+        }
+
+        this.actions.forEach((action, index) => {
+            // Initialize Command Dropdown
+            const cmdDropdown = new SearchableDropdown(`action-command-${index}`, commandOptions);
+            cmdDropdown.placeholder = 'Select action...';
+            if (action.command) {
+                cmdDropdown.setValue(action.command);
+            }
+            cmdDropdown.onChange = (value) => {
+                this.updateAction(index, 'command', value);
+            };
+            this.dropdowns[`command-${index}`] = cmdDropdown;
+
+            // Initialize Speaker Dropdown
+            const needsSpeaker = !this.getNoSpeakerCommands().includes(action.command);
+            if (needsSpeaker || !action.command) {
+                const speakerOptions = [
+                    { value: '%1', label: '%1 (Parameter 1)' },
+                    { value: '%2', label: '%2 (Parameter 2)' },
+                    { value: '%3', label: '%3 (Parameter 3)' },
+                    { value: '_all_', label: 'All Speakers' },
+                    ...speakers.currentSpeakers.map(s => ({ value: s, label: s }))
+                ];
+                
+                const speakerDropdown = new SearchableDropdown(`action-speaker-${index}`, speakerOptions, { allowCustom: true });
+                speakerDropdown.placeholder = 'Speaker...';
+                if (action.speaker) {
+                    speakerDropdown.setValue(action.speaker);
+                }
+                speakerDropdown.onChange = (value) => {
+                    this.updateAction(index, 'speaker', value);
+                };
+                this.dropdowns[`speaker-${index}`] = speakerDropdown;
+            }
+
+            // Initialize Argument Dropdowns
+            const cmdConfig = this.commands[action.command];
+            if (cmdConfig && cmdConfig.args.length > 0) {
+                cmdConfig.args.forEach((argDef, argIndex) => {
+                    const isSpeakerArg = argDef.name === 'speaker' || 
+                                        (argDef.placeholder?.toLowerCase().includes('speaker') && 
+                                         !argDef.placeholder?.toLowerCase().includes('url'));
+
+                    const isUrlField = argDef.name?.toLowerCase().includes('url') || 
+                                      argDef.name?.toLowerCase().includes('uri') ||
+                                      argDef.placeholder?.toLowerCase().includes('url') ||
+                                      argDef.placeholder?.toLowerCase().includes('uri');
+
+                    if (!isUrlField) {
+                        let argOptions = [];
+                        let allowCustom = true;
+                        
+                        if (argDef.type === 'select') {
+                            argOptions = argDef.options.map(opt => ({
+                                value: opt,
+                                label: opt
+                            }));
+                            allowCustom = false;
+                        } else if (isSpeakerArg) {
+                            argOptions = [
+                                { value: '%1', label: '%1 (Parameter 1)' },
+                                { value: '%2', label: '%2 (Parameter 2)' },
+                                { value: '%3', label: '%3 (Parameter 3)' },
+                                ...speakers.currentSpeakers.map(s => ({ value: s, label: s }))
+                            ];
+                        } else {
+                            // For number/text, provide standard parameter options
+                            argOptions = [
+                                { value: '%1', label: '%1 (Parameter 1)' },
+                                { value: '%2', label: '%2 (Parameter 2)' },
+                                { value: '%3', label: '%3 (Parameter 3)' },
+                                { value: '%4', label: '%4 (Parameter 4)' },
+                                { value: '%5', label: '%5 (Parameter 5)' }
+                            ];
+                        }
+                        
+                        const argDropdown = new SearchableDropdown(`action-arg-${index}-${argIndex}`, argOptions, { allowCustom });
+                        argDropdown.placeholder = argDef.placeholder || argDef.name;
+                        const value = action.args[argIndex];
+                        if (value) {
+                            argDropdown.setValue(value);
+                        }
+                        argDropdown.onChange = (value) => {
+                            this.updateAction(index, `arg_${argIndex}`, value);
+                        };
+                        this.dropdowns[`arg-${index}-${argIndex}`] = argDropdown;
+                    }
+                });
+            }
+        });
     },
 
     /**
@@ -530,7 +672,10 @@ window.macros = {
         
         // Build definition from actions
         this.syncDefinition();
-        const definition = document.getElementById('macro-definition').value.trim();
+        let definition = document.getElementById('macro-definition').value.trim();
+        
+        // Clean share links (remove Apple Music query parameters)
+        definition = this.cleanShareLinks(definition);
 
         if (!name || !definition) {
             showToast('Name and at least one action are required', 'warning');
@@ -566,7 +711,13 @@ window.macros = {
      * Deletes a macro
      */
     async delete(macroName) {
-        if (!confirm(`Are you sure you want to delete the macro '${macroName}'?`)) {
+        const confirmed = await showConfirmModal(
+            `Are you sure you want to delete the macro '${macroName}'?`,
+            'Delete Macro',
+            'Delete'
+        );
+        
+        if (!confirmed) {
             return;
         }
 
@@ -576,6 +727,20 @@ window.macros = {
             await this.load();
         } catch (error) {
             showToast('Failed to delete macro', 'error');
+        }
+    },
+
+    /**
+     * Duplicates a macro
+     */
+    async duplicate(macroName) {
+        try {
+            showToast(`Duplicating macro '${macroName}'...`, 'success');
+            const duplicateMacro = await api.duplicateMacro(macroName);
+            showToast(`Macro duplicated as '${duplicateMacro.name}'`, 'success');
+            await this.load();
+        } catch (error) {
+            showToast('Failed to duplicate macro: ' + error.message, 'error');
         }
     },
 
@@ -598,6 +763,21 @@ window.macros = {
             showToast(`Macro '${macroName}' executed successfully`, 'success');
         } catch (error) {
             showToast(`Failed to execute macro: ${error.message}`, 'error');
+        }
+    },
+
+    /**
+     * Copies the URL to trigger a macro execution to clipboard
+     */
+    async copyUrl(macroName) {
+        try {
+            const baseUrl = window.location.origin;
+            const url = `${baseUrl}/api/macro/execute/${encodeURIComponent(macroName)}`;
+            
+            await navigator.clipboard.writeText(url);
+            showToast('Macro URL copied to clipboard', 'success');
+        } catch (error) {
+            showToast(`Failed to copy URL: ${error.message}`, 'error');
         }
     },
 
@@ -640,14 +820,46 @@ window.macros = {
     async handleImportFile(file) {
         if (!file) return;
         
-        // Ask user if they want to merge or replace
-        const merge = confirm(
-            'How would you like to import?\n\n' +
-            'OK = Merge (add new macros, keep existing)\n' +
-            'Cancel = Replace (overwrite all existing macros)'
-        );
+        // Store the file and show the modal
+        this.pendingImportFile = file;
         
-        await this.import(file, merge);
+        // Update filename in modal
+        document.getElementById('import-filename').textContent = file.name;
+        
+        // Show the modal
+        const modal = document.getElementById('import-modal');
+        modal.classList.add('active');
+    },
+
+    /**
+     * Closes the import modal
+     */
+    closeImportModal() {
+        const modal = document.getElementById('import-modal');
+        modal.classList.remove('active');
+        this.pendingImportFile = null;
+    },
+
+    /**
+     * Handles import with merge option
+     */
+    async handleImportMerge() {
+        if (this.pendingImportFile) {
+            const file = this.pendingImportFile;
+            this.closeImportModal();
+            await this.import(file, true);
+        }
+    },
+
+    /**
+     * Handles import with replace option
+     */
+    async handleImportReplace() {
+        if (this.pendingImportFile) {
+            const file = this.pendingImportFile;
+            this.closeImportModal();
+            await this.import(file, false);
+        }
     },
 
     /**

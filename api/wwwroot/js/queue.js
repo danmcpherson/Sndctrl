@@ -5,11 +5,16 @@ window.queue = {
     currentQueue: [],
     currentPosition: 0,
     selectedSpeaker: null,
+    speakerDropdown: null,
 
     /**
      * Initializes the queue module
      */
     async init() {
+        this.speakerDropdown = new SearchableDropdown('queue-speaker-select');
+        this.speakerDropdown.onChange = (value) => {
+            this.load();
+        };
         this.setupEventListeners();
     },
 
@@ -206,7 +211,13 @@ window.queue = {
             return;
         }
 
-        if (!confirm('Clear the entire queue?')) return;
+        const confirmed = await showConfirmModal(
+            'Clear the entire queue?',
+            'Clear Queue',
+            'Clear'
+        );
+        
+        if (!confirmed) return;
 
         try {
             await api.clearQueue(speaker);
@@ -376,20 +387,30 @@ window.queue = {
      * @returns {string|null}
      */
     getSelectedSpeaker() {
-        const selector = document.getElementById('queue-speaker-select');
-        return selector?.value || (speakers.currentSpeakers.length > 0 ? speakers.currentSpeakers[0] : null);
+        if (this.speakerDropdown) {
+            const value = this.speakerDropdown.getValue();
+            if (value) return value;
+        }
+        return speakers.currentSpeakers.length > 0 ? speakers.currentSpeakers[0] : null;
     },
 
     /**
      * Updates the speaker selector dropdown
      */
     updateSpeakerSelector() {
-        const selector = document.getElementById('queue-speaker-select');
-        if (!selector) return;
+        if (!this.speakerDropdown) return;
 
-        const currentValue = selector.value;
-        selector.innerHTML = speakers.currentSpeakers.map(name => 
-            `<option value="${name}" ${name === currentValue ? 'selected' : ''}>${name}</option>`
-        ).join('');
+        const options = speakers.currentSpeakers.map(name => ({
+            value: name,
+            label: name
+        }));
+        
+        this.speakerDropdown.setOptions(options);
+
+        // Auto-select first speaker if none selected
+        const currentValue = this.speakerDropdown.getValue();
+        if (!currentValue && speakers.currentSpeakers.length > 0) {
+            this.speakerDropdown.setValue(speakers.currentSpeakers[0]);
+        }
     }
 };

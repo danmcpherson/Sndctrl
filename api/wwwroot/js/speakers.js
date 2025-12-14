@@ -78,7 +78,13 @@ window.speakers = {
     async rediscover() {
         const grid = document.getElementById('speakers-grid');
         const rediscoverBtn = document.getElementById('rediscover-btn');
-        const shouldRediscover = window.confirm('Rediscover speakers? This will overwrite the existing local speaker cache file.');
+        
+        const shouldRediscover = await showConfirmModal(
+            'Rediscover speakers? This will overwrite the existing local speaker cache file.',
+            'Rediscover Speakers',
+            'Rediscover'
+        );
+        
         if (!shouldRediscover) {
             return;
         }
@@ -378,6 +384,22 @@ window.speakers = {
     }, 300),
 
     /**
+     * Set group volume (with debouncing)
+     */
+    setGroupVolume: debounce(async function(speakerName, volume) {
+        try {
+            await api.setGroupVolume(speakerName, volume);
+            const card = document.querySelector(`.speaker-card[data-speaker="${speakerName}"]`);
+            if (card) {
+                card.querySelector('.group-volume-value').textContent = volume;
+            }
+            showToast(`Group volume set to ${volume}`, 'success');
+        } catch (error) {
+            showToast('Failed to set group volume', 'error');
+        }
+    }, 300),
+
+    /**
      * Toggle mute
      */
     async toggleMute(speakerName) {
@@ -524,18 +546,45 @@ window.speakers = {
                 card.classList.remove('group-member');
                 const otherMembers = groupInfo.members.filter(m => m !== speakerName);
                 groupInfoDiv.innerHTML = `<span class="group-badge coordinator" style="background-color: ${groupInfo.color};">⬤ Group Leader</span> <span class="group-members">+ ${otherMembers.join(', ')}</span>`;
+                
+                // Show all controls for coordinator
+                card.querySelector('.speaker-track')?.style.removeProperty('display');
+                card.querySelector('.speaker-controls')?.style.removeProperty('display');
+                card.querySelector('.playmode-controls')?.style.removeProperty('display');
+                
+                // Show group volume control for coordinator
+                const groupVolumeControl = card.querySelector('.group-volume-control');
+                if (groupVolumeControl) {
+                    groupVolumeControl.style.display = 'block';
+                }
             } else {
                 card.classList.add('group-member');
                 card.classList.remove('group-coordinator');
                 groupInfoDiv.innerHTML = `<span class="group-badge member" style="border-color: ${groupInfo.color}; color: ${groupInfo.color};">◯ Grouped with ${groupInfo.coordinator}</span>`;
+                
+                // Hide playback controls for group members (they're controlled by the leader)
+                card.querySelector('.speaker-track').style.display = 'none';
+                card.querySelector('.speaker-controls').style.display = 'none';
+                card.querySelector('.playmode-controls').style.display = 'none';
             }
             groupInfoDiv.style.display = 'block';
         } else {
-            // Not in a group
+            // Not in a group - show all controls
             card.classList.remove('grouped', 'group-coordinator', 'group-member');
             card.style.removeProperty('--group-color');
             groupInfoDiv.style.display = 'none';
             groupInfoDiv.innerHTML = '';
+            
+            // Ensure all controls are visible when not grouped
+            card.querySelector('.speaker-track')?.style.removeProperty('display');
+            card.querySelector('.speaker-controls')?.style.removeProperty('display');
+            card.querySelector('.playmode-controls')?.style.removeProperty('display');
+            
+            // Hide group volume control when not grouped
+            const groupVolumeControl = card.querySelector('.group-volume-control');
+            if (groupVolumeControl) {
+                groupVolumeControl.style.display = 'none';
+            }
         }
     },
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SonosSoundHub - Control Your Sonos System</title>
+    <title>Sonos Sound Hub - Control Your Sonos System</title>
     <link rel="stylesheet" href="css/sonos-theme.css">
     <link rel="stylesheet" href="css/components.css">
 </head>
@@ -13,7 +13,14 @@
         <header class="app-header">
             <div class="container">
                 <div class="header-content">
-                    <h1 class="logo">SonosSoundHub</h1>
+                    <h1 class="logo">
+                        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 18V5l12-2v13"></path>
+                            <circle cx="6" cy="18" r="3"></circle>
+                            <circle cx="18" cy="16" r="3"></circle>
+                        </svg>
+                        Sonos Sound Hub
+                    </h1>
                     <div class="header-actions">
                         <button id="refresh-btn" class="btn btn-icon" onclick="speakers.updateAllSpeakers()" title="Refresh speaker status">
                             <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -73,7 +80,32 @@
                 <!-- Macros Tab -->
                 <div id="macros-tab" class="tab-content">
                     <div class="section-header">
-                        <h2>Macros</h2>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; position: relative;">
+                            <h2>Macros</h2>
+                            <button id="macros-file-info-btn" class="icon-btn-subtle" title="Show file location">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                    <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                                    <text x="8" y="11" text-anchor="middle" font-size="10" font-weight="bold">i</text>
+                                </svg>
+                            </button>
+                            <!-- Tooltip popup for file path -->
+                            <div id="macros-file-tooltip" class="file-info-tooltip" style="display: none;">
+                                <div class="tooltip-content">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem;">
+                                        <div style="flex: 1; min-width: 0;">
+                                            <div style="font-size: 0.75rem; color: var(--color-gray-500); margin-bottom: 0.25rem;">File Location</div>
+                                            <code id="macros-file-path" style="font-size: 0.875rem; word-break: break-all;"></code>
+                                        </div>
+                                        <button id="copy-file-path-btn" class="btn-icon-sm" title="Copy path">
+                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                                <rect x="5" y="5" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                                                <path d="M3 11V3c0-.55.45-1 1-1h8" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <p class="subtitle">Create and manage custom automation sequences</p>
                         <div class="header-actions">
                             <button id="new-macro-btn" class="btn btn-primary">
@@ -93,9 +125,6 @@
                         </div>
                         <input type="file" id="import-file-input" accept=".txt" style="display: none;">
                     </div>
-                    <div id="macros-file-info" class="info-message" style="display: none; margin-bottom: 1rem; font-size: 0.875rem;">
-                        <p style="margin: 0; color: var(--color-gray-600);">📄 <strong>File:</strong> <code id="macros-file-path" style="background: var(--color-gray-100); padding: 2px 6px; border-radius: 3px;"></code></p>
-                    </div>
                     <div id="macros-list" class="macros-list">
                         <!-- Macro cards will be inserted here -->
                     </div>
@@ -107,9 +136,7 @@
                         <h2>Favorites</h2>
                         <p class="subtitle">Quick access to your Sonos favorites, playlists, and radio</p>
                         <div class="header-actions">
-                            <select id="favorites-speaker-select" class="form-control" style="width: auto; min-width: 150px;">
-                                <option value="">Select speaker...</option>
-                            </select>
+                            <div id="favorites-speaker-select"></div>
                         </div>
                     </div>
                     
@@ -155,9 +182,7 @@
                         <h2>Queue</h2>
                         <p class="subtitle">Manage your playback queue</p>
                         <div class="header-actions">
-                            <select id="queue-speaker-select" class="form-control" style="width: auto; min-width: 150px;">
-                                <option value="">Select speaker...</option>
-                            </select>
+                            <div id="queue-speaker-select"></div>
                             <button id="add-sharelink-btn" class="btn btn-secondary" title="Add Spotify/Apple Music link">
                                 <span class="icon">+</span>
                                 Add Link
@@ -228,8 +253,8 @@
                             <span class="icon">⚙️</span> Advanced: Raw Definition
                         </summary>
                         <div class="raw-definition-content">
-                            <textarea id="macro-definition" class="form-control code-input" rows="3" placeholder="Living Room volume 40 : Kitchen play"></textarea>
-                            <small class="form-hint">Format: <code>Speaker action arguments : Speaker action arguments</code></small>
+                            <textarea id="macro-definition" class="form-control code-input" rows="3" placeholder="Living Room volume 40 : Kitchen play" onchange="macros.syncFromDefinition()"></textarea>
+                            <small class="form-hint">Format: <code>Speaker action arguments : Speaker action arguments</code>. Edit here and the visual builder will update.</small>
                         </div>
                     </details>
 
@@ -341,6 +366,57 @@
                         <button type="submit" class="btn btn-primary">Save Macro</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Macros Modal -->
+    <div id="import-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Import Macros</h3>
+                <button class="modal-close" id="close-import-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="import-message">You're importing macros from: <strong id="import-filename"></strong></p>
+                <p class="import-question">How would you like to import these macros?</p>
+                
+                <div class="import-options">
+                    <button class="btn btn-primary import-option-btn" id="import-merge-btn">
+                        <div class="import-option-content">
+                            <div>
+                                <strong>Merge</strong>
+                                <p>Add new macros and keep existing ones</p>
+                            </div>
+                        </div>
+                    </button>
+                    
+                    <button class="btn btn-danger import-option-btn" id="import-replace-btn">
+                        <div class="import-option-content">
+                            <div>
+                                <strong>Replace All</strong>
+                                <p>Delete all existing macros and replace with imported ones</p>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content modal-confirm">
+            <div class="modal-header">
+                <h3 id="confirm-modal-title">Confirm Action</h3>
+                <button class="modal-close" onclick="hideConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-modal-message"></p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideConfirmModal()">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirm-modal-confirm-btn">Confirm</button>
+                </div>
             </div>
         </div>
     </div>

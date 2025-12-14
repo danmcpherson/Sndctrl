@@ -9,11 +9,13 @@ window.favorites = {
     isLoadingFavorites: false,
     isLoadingPlaylists: false,
     isLoadingRadio: false,
+    speakerDropdown: null,
 
     /**
      * Initializes the favorites module
      */
     async init() {
+        this.speakerDropdown = new SearchableDropdown('favorites-speaker-select');
         this.setupEventListeners();
     },
 
@@ -569,11 +571,9 @@ window.favorites = {
      * @returns {string|null}
      */
     getSelectedSpeaker() {
-        const selector = document.getElementById('favorites-speaker-select');
-        const value = selector?.value;
-        // Return the selected value if it's not empty, otherwise fall back to first speaker
-        if (value && value.trim()) {
-            return value;
+        if (this.speakerDropdown) {
+            const value = this.speakerDropdown.getValue();
+            if (value) return value;
         }
         return speakers.currentSpeakers.length > 0 ? speakers.currentSpeakers[0] : null;
     },
@@ -582,17 +582,19 @@ window.favorites = {
      * Updates the speaker dropdown with available speakers
      */
     updateSpeakerSelector() {
-        const selector = document.getElementById('favorites-speaker-select');
-        if (!selector) return;
+        if (!this.speakerDropdown) return;
 
-        const currentValue = selector.value;
-        selector.innerHTML = speakers.currentSpeakers.map(name => 
-            `<option value="${name}" ${name === currentValue ? 'selected' : ''}>${name}</option>`
-        ).join('');
+        const options = speakers.currentSpeakers.map(name => ({
+            value: name,
+            label: name
+        }));
+        
+        this.speakerDropdown.setOptions(options);
 
-        // Auto-select first speaker if none selected or if current selection is empty
-        if ((!currentValue || !currentValue.trim()) && speakers.currentSpeakers.length > 0) {
-            selector.value = speakers.currentSpeakers[0];
+        // Auto-select first speaker if none selected
+        const currentValue = this.speakerDropdown.getValue();
+        if (!currentValue && speakers.currentSpeakers.length > 0) {
+            this.speakerDropdown.setValue(speakers.currentSpeakers[0]);
         }
     }
 };

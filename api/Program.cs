@@ -9,8 +9,11 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     WebRootPath = Path.Combine(baseDir, "wwwroot")
 });
 
-// Listen on all interfaces for Pi deployment
-builder.WebHost.UseUrls("http://0.0.0.0:5000");
+// Listen on all interfaces for Pi deployment (can be overridden by launchSettings.json in development)
+if (builder.Environment.IsProduction())
+{
+    builder.WebHost.UseUrls("http://0.0.0.0:5000");
+}
 
 // Add services
 builder.Services.AddControllers()
@@ -18,6 +21,12 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
+
+// Configure form options for file uploads
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10 MB
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddMemoryCache();

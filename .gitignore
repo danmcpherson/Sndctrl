@@ -17,7 +17,8 @@ obj/
 .vs/
 
 # SQLite databases
-data/
+data/*
+!data/.gitkeep
 *.db
 *.db-shm
 *.db-wal

@@ -95,6 +95,16 @@ body {
     font-weight: 700;
     color: var(--color-black);
     letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.logo-icon {
+    width: 28px;
+    height: 28px;
+    stroke-width: 2.5;
+    color: var(--color-black);
 }
 
 .header-actions {

@@ -93,7 +93,21 @@ public class MacroController : ControllerBase
     }
 
     /// <summary>
-    /// Executes a macro
+    /// Duplicates a macro with a new name
+    /// </summary>
+    [HttpPost("{name}/duplicate")]
+    public async Task<IActionResult> DuplicateMacro(string name)
+    {
+        var duplicateMacro = await _macroService.DuplicateMacroAsync(name);
+        if (duplicateMacro != null)
+        {
+            return Ok(duplicateMacro);
+        }
+        return NotFound(new { message = $"Macro '{name}' not found" });
+    }
+
+    /// <summary>
+    /// Executes a macro (POST with JSON body)
     /// </summary>
     [HttpPost("execute")]
     public async Task<IActionResult> ExecuteMacro([FromBody] MacroExecuteRequest request)
@@ -111,6 +125,29 @@ public class MacroController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to execute macro: {Name}", request.MacroName);
+            return StatusCode(500, new { message = $"Failed to execute macro: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Executes a macro by name (GET - browser friendly)
+    /// </summary>
+    [HttpGet("execute/{name}")]
+    public async Task<IActionResult> ExecuteMacroByName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return BadRequest(new { message = "Macro name is required" });
+        }
+
+        try
+        {
+            var result = await _macroService.ExecuteMacroAsync(name, new List<string>());
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to execute macro: {Name}", name);
             return StatusCode(500, new { message = $"Failed to execute macro: {ex.Message}" });
         }
     }
@@ -152,10 +189,17 @@ public class MacroController : ControllerBase
     /// Imports macros from an uploaded file
     /// </summary>
     [HttpPost("import")]
-    public async Task<IActionResult> ImportMacros(IFormFile file, [FromQuery] bool merge = false)
+    [RequestSizeLimit(10 * 1024 * 1024)] // 10 MB
+    public async Task<IActionResult> ImportMacros([FromForm] IFormFile? file, [FromQuery] bool merge = false)
     {
+        _logger.LogWarning("Import request received. File: {FileName}, Length: {Length}, Merge: {Merge}", 
+            file?.FileName ?? "null", 
+            file?.Length ?? 0, 
+            merge);
+        
         if (file == null || file.Length == 0)
         {
+            _logger.LogWarning("Import failed: No file uploaded - file is null or empty");
             return BadRequest(new { message = "No file uploaded" });
         }
 
@@ -164,11 +208,15 @@ public class MacroController : ControllerBase
             using var reader = new StreamReader(file.OpenReadStream());
             var content = await reader.ReadToEndAsync();
             
+            _logger.LogWarning("Read {Length} characters from uploaded file", content.Length);
+            
             var result = await _macroService.ImportMacrosAsync(content, merge);
             if (result.Success)
             {
                 return Ok(new { message = result.Message, imported = result.ImportedCount });
             }
+            
+            _logger.LogWarning("Import failed: {Message}", result.Message);
             return BadRequest(new { message = result.Message });
         }
         catch (Exception ex)
