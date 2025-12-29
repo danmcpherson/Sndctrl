@@ -37,7 +37,8 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
           else
-            echo "VERSION=0.0.0-${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
+            # Offset to account for workflow rename (old workflow had 23+ runs)
+            echo "VERSION=0.0.0-$((GITHUB_RUN_NUMBER + 30))" >> $GITHUB_ENV
           fi
 
       - name: Install packaging tools
