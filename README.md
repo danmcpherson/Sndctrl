@@ -1,10 +1,80 @@
-# Sonos Sound Hub
+# 🔊 Sonos Sound Hub
 
-Self-hosted Sonos control UI and API built for Raspberry Pi. A thin web layer over the fantastic [soco-cli](https://github.com/avantrec/soco-cli) library. Runs fully offline with a lightweight vanilla JS frontend and an ASP.NET Core backend.
+**Take back control of your Sonos system.** A beautiful, self-hosted control panel that runs entirely on your local network—no cloud, no accounts, no subscriptions.
 
-## Quick Start (Raspberry Pi)
+<p align="center">
+  <img src="docs/screenshots/hero.png" alt="Sonos Sound Hub Interface" width="800">
+</p>
 
-### Easiest: install via APT (self-contained binary)
+## ✨ Why Sonos Sound Hub?
+
+Tired of the official Sonos app's limitations? Sonos Sound Hub gives you **powerful automation** and **instant control** over your entire Sonos system from any device on your network.
+
+### 🎯 Key Benefits
+
+- **🏠 100% Local** — Runs on a Raspberry Pi in your home. No cloud dependency, no internet required, your data stays private.
+- **⚡ One-Tap Macros** — Create powerful automation sequences: "Movie Night" dims the lights, groups your speakers, sets the volume, and starts your favorite playlist—all with one tap.
+- **📱 Works Everywhere** — Access from any phone, tablet, or computer. Installs as an app on iPhone and Android.
+- **🔧 Set It and Forget It** — Install once, runs forever. Auto-starts on boot.
+
+---
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/macros-list.png" alt="Macros List" width="250">
+  <img src="docs/screenshots/macro-editor.png" alt="Macro Editor" width="250">
+  <img src="docs/screenshots/speakers.png" alt="Speaker Control" width="250">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/speaker-details.png" alt="Speaker Details" width="250">
+  <img src="docs/screenshots/grouping.png" alt="Speaker Grouping" width="250">
+  <img src="docs/screenshots/mobile-home.png" alt="Mobile Home Screen" width="250">
+</p>
+
+---
+
+## 🎛️ Features
+
+### 🎬 Powerful Macros
+Build custom automation sequences using a visual editor. Chain together any combination of:
+- **Playback controls** — play, pause, skip, seek
+- **Volume management** — set levels, ramp up/down, mute
+- **Content playback** — favorites, playlists, radio stations, Spotify/Apple Music links
+- **Speaker grouping** — party mode, room-by-room, transfers
+- **Timers & delays** — sleep timers, wait commands, scheduled actions
+- **EQ settings** — bass, treble, night mode, dialog enhancement
+
+### 🔈 Speaker Control
+- Real-time now playing display with album art
+- Individual and group volume control
+- Quick speaker grouping/ungrouping
+- See what's playing across your whole home
+
+### 📲 Mobile-First Design
+- Clean, touch-friendly interface
+- Install as a home screen app (PWA)
+- Works on iPhone, iPad, Android, and desktop browsers
+- Dark theme that looks great everywhere
+
+---
+
+## 🚀 Get Started
+
+### Option 1: Pre-Built Raspberry Pi (Easiest)
+
+**Want a plug-and-play solution?** I offer pre-configured Raspberry Pi units with Sonos Sound Hub ready to go.
+
+📧 **Email [sonoshub@dmcemail.com](mailto:sonoshub@dmcemail.com)** for pricing and availability.
+
+Just plug it in, connect to your network, and you're ready to control your Sonos system.
+
+---
+
+### Option 2: Install on Your Own Raspberry Pi
+
+#### One-Line Install (Recommended)
 
 ```bash
 curl -fsSL https://danmcpherson.github.io/SonosSoundHub/KEY.gpg | sudo gpg --dearmor -o /usr/share/keyrings/sonos-sound-hub.gpg
@@ -12,195 +82,57 @@ ARCH=$(dpkg --print-architecture)
 echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/sonos-sound-hub.gpg] https://danmcpherson.github.io/SonosSoundHub stable main" | sudo tee /etc/apt/sources.list.d/sonos-sound-hub.list
 sudo apt-get update
 sudo apt-get install sonos-sound-hub
-# Install soco-cli: see https://github.com/avantrec/soco-cli for installation instructions
 ```
 
-**Run at startup (optional):**
+Then install the required [soco-cli](https://github.com/avantrec/soco-cli) dependency:
+```bash
+pipx install soco-cli
+```
+
+**Start on boot:**
 ```bash
 sudo systemctl enable sonos-sound-hub
 sudo systemctl start sonos-sound-hub
 ```
 
-**Run in foreground:**
-```bash
-sonos-sound-hub
-```
+**Access the UI:** Open `http://<your-pi-ip>:5000` in any browser.
 
-- The script auto-detects `dpkg --print-architecture` (arm64 or armhf) and uses the matching repo build.
-- Binary is self-contained; no .NET runtime needed.
-- Install [soco-cli](https://github.com/avantrec/soco-cli) separately (required dependency).
-- A systemd service file is installed automatically; use `systemctl enable/start` to run at startup.
+---
 
-### Manual install (clone & run)
+### Requirements
 
-1. **Install prerequisites**
-   ```bash
-   sudo apt update
-   sudo apt install -y git curl python3 python3-pip python3-venv pipx
-   pipx ensurepath
-   ```
-
-2. **Install soco-cli**
-   - Follow the installation instructions at https://github.com/avantrec/soco-cli
-
-3. **Clone and run**
-   ```bash
-   git clone https://github.com/danmcpherson/SonosSoundHub.git
-   cd SonosSoundHub/api
-   dotnet restore
-   dotnet run
-   ```
-
-### Install from a release artifact (tarball)
-
-1. Grab the latest tarball from GitHub Releases (choose `linux-arm64` for 64-bit Pi OS, `linux-arm` for 32-bit).
-   ```bash
-   curl -LO https://github.com/danmcpherson/SonosSoundHub/releases/latest/download/sonos-sound-hub-linux-arm64.tar.gz
-   ```
-2. Extract and run ([soco-cli](https://github.com/avantrec/soco-cli) still required):
-   ```bash
-   mkdir -p ~/sonos-sound-hub
-   tar -xzf sonos-sound-hub-linux-arm64.tar.gz -C ~/sonos-sound-hub
-   cd ~/sonos-sound-hub
-   ./api
-   ```
-
-**Open the UI**
-- On the Pi: `http://localhost:5000`
-- From another device: `http://<pi-ip-or-hostname>:5000`
-
-The app listens on all network interfaces (0.0.0.0:5000), auto-starts the soco-cli HTTP API server, discovers speakers, and serves the web UI.
-
-## Why This Project
-
-- Runs entirely on-device—no cloud, no accounts
-- One-line APT install with automated updates via GitHub Actions
-- Self-contained binary (no .NET runtime required)
-- Optimized for Raspberry Pi ARM (armhf and arm64)
-- Simple, fail-fast design using .NET 8 + vanilla JS
-- SQLite-backed, file-based data in `data/`
-
-## Requirements
-
-### For APT Install (Recommended)
-- Raspberry Pi 3B+ or newer (works on 32-bit or 64-bit Pi OS)
+- Raspberry Pi 3B+ or newer (32-bit or 64-bit Pi OS)
 - Python 3.11+ with `pipx`
-- [soco-cli](https://github.com/avantrec/soco-cli) for Sonos control
-- Network access to your Sonos speakers (same LAN)
+- Your Pi must be on the same network as your Sonos speakers
 
-### For Development
-- Raspberry Pi 3B+ or newer (64-bit OS recommended)
-- .NET 8 SDK
-- Python 3.11+ with `pipx`
-- [soco-cli](https://github.com/avantrec/soco-cli) for Sonos control
-- Network access to your Sonos speakers (same LAN)
+---
 
-## Configuration
+## 📱 Add to Your Home Screen
 
-Edit `api/appsettings.json` (or `appsettings.Development.json`) to adjust runtime settings:
+Sonos Sound Hub works as a Progressive Web App (PWA). Add it to your home screen for an app-like experience:
 
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Data Source=data/app.db"
-  },
-  "DataDirectory": "data",
-  "SocoCli": {
-    "Port": 8000,
-    "UseLocalCache": false
-  }
-}
-```
+**iPhone/iPad:** Open the URL in Safari → tap Share → "Add to Home Screen"
 
-Note: The macros file path is automatically derived from `DataDirectory` (always `data/macros.txt`).
+**Android:** Open the URL in Chrome → tap the menu → "Add to Home screen"
 
-- Database lives under `data/` (gitignored). Created automatically on first run.
-- Adjust `SocoCli:Port` if 8000 is in use.
-- Set `ASPNETCORE_ENVIRONMENT=Development` for verbose errors while developing.
+---
 
-## Run Locally (development)
+## ❓ Troubleshooting
 
-```bash
-cd api
-dotnet run
-```
+| Problem | Solution |
+|---------|----------|
+| Speakers not found | Ensure your Pi is on the same network as your Sonos speakers |
+| Can't access the UI | Check that the service is running: `sudo systemctl status sonos-sound-hub` |
+| Port already in use | Another app is using port 5000 or 8000. Stop it or change ports in settings |
 
-- Default URL: `http://localhost:5000`
-- VS Code tasks: `run`, `build`, `clean`, `publish`
-- Hot reload available via `dotnet watch run` (optional).
+---
 
-## Publish and Deploy to Raspberry Pi (release)
+## 🙏 Acknowledgments
 
-1. Publish on your dev machine (or on the Pi):
-   ```bash
-   cd api
-   dotnet publish -c Release -o ./publish
-   ```
+Built on the excellent [soco-cli](https://github.com/avantrec/soco-cli) library.
 
-2. Copy the publish folder to the Pi:
-   ```bash
-   scp -r api/publish/ pi@<pi-hostname-or-ip>:/home/pi/sonos-sound-hub/
-   ```
+---
 
-3. Run on the Pi:
-   ```bash
-   cd /home/pi/sonos-sound-hub
-   dotnet api.dll
-   ```
+## 📄 License
 
-4. Optional: systemd service for auto-start
-   ```bash
-   sudo systemctl enable sonos-sound-hub
-   sudo systemctl start sonos-sound-hub
-   sudo systemctl status sonos-sound-hub
-   ```
-
-## Features
-
-- **One-line APT install** with signed repository and automated releases
-- **Self-contained deployment** (no .NET runtime dependency)
-- **Sonos discovery and control** via [soco-cli](https://github.com/avantrec/soco-cli)
-- **Macro management** backed by `data/macros.txt`
-- **REST API** (ASP.NET Core) with camelCase JSON
-- **SQLite storage** - zero external services
-- **Vanilla JS frontend** served from `wwwroot/`
-- **ARM-optimized** single-file binaries for armhf and arm64
-
-## Project Structure
-
-```
-.
-├── api/                      # ASP.NET Core Web API + frontend
-│   ├── Controllers/          # API endpoints
-│   ├── Services/             # Sonos + macro services
-│   ├── Models/               # DTOs and EF models
-│   ├── wwwroot/              # HTML, JS, CSS
-│   ├── data/                 # SQLite DB and macros.txt (gitignored)
-│   ├── Program.cs            # Entry point
-│   └── appsettings*.json     # Configuration
-├── SETUP.md                  # soco-cli and tooling setup
-├── TEST_ENVIRONMENT.md       # Sample endpoints and UI
-└── README.md
-```
-
-## Development Tips
-
-- Keep `soco-cli` running on the same host; the app launches it automatically.
-- If ports conflict, change `SocoCli:Port` and the app port via `ASPNETCORE_URLS` (example: `http://0.0.0.0:5002`).
-- For debugging in VS Code, use the included tasks/launch config.
-
-## Troubleshooting
-
-- **APT key errors:** Ensure you've run the full install script including the `gpg --dearmor` step. If you see NO_PUBKEY errors, re-add the key.
-- **Package not found:** Run `sudo apt-get update` and verify your architecture matches (armhf for 32-bit, arm64 for 64-bit). Check with `dpkg --print-architecture`.
-- **Binary not found after install:** The symlink should be at `/usr/local/bin/sonos-sound-hub`. Run `hash -r` to refresh your shell's command cache.
-- **Service not starting:** Check logs with `sudo journalctl -u sonos-sound-hub -f`. Ensure soco-cli is installed and the binary has execute permissions.
-- **Port in use (5000 or 8000):** `lsof -i :5000` or `lsof -i :8000`, then stop the conflicting process or change the port in config.
-- **Speakers not discovered:** ensure the Pi is on the same LAN as Sonos, power-cycle a speaker, or run `sonos-discover`.
-- **Refresh cached speaker list:** if `SocoCli:UseLocalCache` is enabled, use the **Rediscover** button in the UI to run `/rediscover` (this overwrites the local speaker cache file and replaces the cached list).
-- **soco-cli not found:** Follow the installation guide at https://github.com/avantrec/soco-cli.
-- **Database issues:** delete `api/data/app.db` to regenerate (data loss) or confirm `DataDirectory` points to a writable path.
-
-## License
-
-MIT
+MIT License - Use it, modify it, share it.
