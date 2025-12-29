@@ -16,6 +16,9 @@ window.mobileApp = {
     async init() {
         console.log('Initializing Sonos Sound Hub Mobile App');
         
+        // Load version info
+        this.loadVersion();
+        
         // Ensure server is running
         await this.ensureServerRunning();
         
@@ -47,6 +50,24 @@ window.mobileApp = {
             statusIndicator.classList.remove('connected');
             statusIndicator.classList.add('error');
             this.showToast('Failed to connect to server', 'error');
+        }
+    },
+
+    /**
+     * Load and display the app version
+     */
+    async loadVersion() {
+        try {
+            const response = await fetch('/api/version');
+            if (response.ok) {
+                const data = await response.json();
+                const versionEl = document.getElementById('app-version');
+                if (versionEl && data.version) {
+                    versionEl.textContent = `v${data.version}`;
+                }
+            }
+        } catch (error) {
+            console.debug('Could not load version:', error);
         }
     },
 

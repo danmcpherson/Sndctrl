@@ -71,6 +71,23 @@ app.UseStaticFiles();
 // API routes - must be BEFORE fallback
 app.MapControllers();
 
+// Simple version endpoint
+app.MapGet("/api/version", () => 
+{
+    var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown";
+    var informationalVersion = typeof(Program).Assembly
+        .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+        .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+        .FirstOrDefault()?.InformationalVersion ?? version;
+    // Strip git hash suffix (everything after +)
+    var plusIndex = informationalVersion.IndexOf('+');
+    if (plusIndex > 0)
+    {
+        informationalVersion = informationalVersion.Substring(0, plusIndex);
+    }
+    return Results.Ok(new { version = informationalVersion });
+});
+
 // Explicit route for mobile app - use MapFallbackToFile pattern for consistency
 app.Map("/app", async context =>
 {

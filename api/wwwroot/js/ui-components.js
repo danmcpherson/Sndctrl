@@ -105,7 +105,14 @@ function createSpeakerCard(speakerName) {
         
         <div class="volume-control group-volume-control" style="display: none;">
             <div class="volume-label">
-                <span>🔊 Group Volume</span>
+                <span class="volume-label-text">
+                    <svg class="volume-label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                    </svg>
+                    Group
+                </span>
                 <span class="group-volume-value">--</span>
             </div>
             <input type="range" class="group-volume-slider" min="0" max="100" value="50" 

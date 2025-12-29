@@ -100,6 +100,13 @@ body {
     gap: var(--spacing-sm);
 }
 
+.logo .app-version {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--color-gray-400);
+    margin-left: var(--spacing-xs);
+}
+
 .logo-icon {
     width: 28px;
     height: 28px;

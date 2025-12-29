@@ -5,6 +5,9 @@
     <OutputType>Exe</OutputType>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Version - can be overridden at build time with -p:Version=x.x.x -->
+    <Version>0.0.0</Version>
+    <InformationalVersion>dev</InformationalVersion>
     <!-- Disable default content items to avoid duplicates -->
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>

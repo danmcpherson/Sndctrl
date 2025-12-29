@@ -6,6 +6,9 @@
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('SonosSoundHub initialized');
 
+    // Load version info
+    loadVersion();
+
     // Setup tab navigation
     setupTabNavigation();
 
@@ -17,6 +20,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     favorites.init();
     queue.init();
 });
+
+/**
+ * Load and display the app version
+ */
+async function loadVersion() {
+    try {
+        const response = await fetch('/api/version');
+        if (response.ok) {
+            const data = await response.json();
+            const versionEl = document.getElementById('app-version');
+            if (versionEl && data.version) {
+                versionEl.textContent = `v${data.version}`;
+            }
+        }
+    } catch (error) {
+        console.debug('Could not load version:', error);
+    }
+}
 
 /**
  * Tests the connection to the soco-cli server
