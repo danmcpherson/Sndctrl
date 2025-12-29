@@ -204,11 +204,10 @@ window.mobileApp = {
         try {
             const statePromises = this.speakers.map(async (speaker) => {
                 try {
-                    const [info, volume] = await Promise.all([
-                        api.getSpeakerInfo(speaker),
-                        api.getVolume(speaker).catch(() => ({ volume: 0 }))
-                    ]);
-                    return { speaker, info, volume: volume.volume };
+                    // getSpeakerInfo already includes volume
+                    const info = await api.getSpeakerInfo(speaker).catch(() => null);
+                    const volume = info?.volume ?? 0;
+                    return { speaker, info, volume };
                 } catch (error) {
                     console.error(`Failed to get info for ${speaker}:`, error);
                     return { speaker, info: null, volume: 0 };
@@ -252,12 +251,11 @@ window.mobileApp = {
         container.innerHTML = this.speakers.map(speaker => {
             const state = this.speakerStates[speaker] || {};
             const info = state.info || {};
-            const volume = state.volume || 0;
-            const isPlaying = info.state === 'PLAYING';
-            const trackTitle = info.title || 'No track';
-            const trackArtist = info.artist || '';
-            const groupInfo = info.coordinator && info.coordinator !== speaker 
-                ? info.coordinator 
+            const volume = info.volume ?? state.volume ?? 0;
+            const isPlaying = info.playbackState === 'PLAYING';
+            const trackTitle = info.currentTrack || 'No track';
+            const groupInfo = info.groupName && info.groupName !== speaker 
+                ? info.groupName 
                 : null;
             
             return `
@@ -274,7 +272,6 @@ window.mobileApp = {
                     
                     <div class="speaker-track-info">
                         <div class="track-title">${this.escapeHtml(trackTitle)}</div>
-                        ${trackArtist ? `<div class="track-artist">${this.escapeHtml(trackArtist)}</div>` : ''}
                     </div>
                     
                     <div class="speaker-controls">
@@ -400,12 +397,11 @@ window.mobileApp = {
      */
     async updateSpeakerState(speaker) {
         try {
-            const [info, volumeData] = await Promise.all([
-                api.getSpeakerInfo(speaker),
-                api.getVolume(speaker).catch(() => ({ volume: 0 }))
-            ]);
+            // getSpeakerInfo already includes volume
+            const info = await api.getSpeakerInfo(speaker).catch(() => null);
+            const volume = info?.volume ?? 0;
             
-            this.speakerStates[speaker] = { info, volume: volumeData.volume };
+            this.speakerStates[speaker] = { info, volume };
             this.renderSpeakers();
         } catch (error) {
             console.error(`Failed to update ${speaker}:`, error);
