@@ -186,9 +186,13 @@ window.macros = {
             console.error('Failed to load macros:', error);
             list.innerHTML = `
                 <div class="info-message">
-                    <p>Error loading macros: ${error.message}</p>
+                    <p class="js-macros-load-error"></p>
                 </div>
             `;
+            const errEl = list.querySelector('.js-macros-load-error');
+            if (errEl) {
+                errEl.textContent = `Error loading macros: ${error?.message ?? String(error)}`;
+            }
         }
     },
 

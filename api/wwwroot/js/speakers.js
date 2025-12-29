@@ -63,10 +63,14 @@ window.speakers = {
             console.error('Failed to discover speakers:', error);
             grid.innerHTML = `
                 <div class="info-message">
-                    <p>Error discovering speakers: ${error.message}</p>
+                    <p class="js-speakers-discover-error"></p>
                     <button class="btn btn-primary" onclick="speakers.discover()">Try Again</button>
                 </div>
             `;
+            const errEl = grid.querySelector('.js-speakers-discover-error');
+            if (errEl) {
+                errEl.textContent = `Error discovering speakers: ${error?.message ?? String(error)}`;
+            }
             updateStatus(false, 'Discovery failed');
             showToast('Failed to discover speakers', 'error');
         }
@@ -105,10 +109,14 @@ window.speakers = {
             console.error('Failed to rediscover speakers:', error);
             grid.innerHTML = `
                 <div class="info-message">
-                    <p>Error rediscovering speakers: ${error.message}</p>
+                    <p class="js-speakers-rediscover-error"></p>
                     <button class="btn btn-primary" onclick="speakers.rediscover()">Try Again</button>
                 </div>
             `;
+            const errEl = grid.querySelector('.js-speakers-rediscover-error');
+            if (errEl) {
+                errEl.textContent = `Error rediscovering speakers: ${error?.message ?? String(error)}`;
+            }
             updateStatus(false, 'Rediscovery failed');
             showToast('Failed to rediscover speakers', 'error');
         }
@@ -253,7 +261,10 @@ window.speakers = {
     async updateSpeakerInfo(speakerName) {
         try {
             const info = await api.getSpeakerInfo(speakerName);
-            const card = document.querySelector(`.speaker-card[data-speaker="${speakerName}"]`);
+            const escaped = (window.CSS && typeof window.CSS.escape === 'function')
+                ? window.CSS.escape(String(speakerName))
+                : String(speakerName);
+            const card = document.querySelector(`.speaker-card[data-speaker="${escaped}"]`);
             if (!card) return;
 
             // Update status - only if we have valid playback state
@@ -374,7 +385,10 @@ window.speakers = {
     setVolume: debounce(async function(speakerName, volume) {
         try {
             await api.setVolume(speakerName, volume);
-            const card = document.querySelector(`.speaker-card[data-speaker="${speakerName}"]`);
+            const escaped = (window.CSS && typeof window.CSS.escape === 'function')
+                ? window.CSS.escape(String(speakerName))
+                : String(speakerName);
+            const card = document.querySelector(`.speaker-card[data-speaker="${escaped}"]`);
             if (card) {
                 card.querySelector('.volume-value').textContent = volume;
             }
@@ -389,7 +403,10 @@ window.speakers = {
     setGroupVolume: debounce(async function(speakerName, volume) {
         try {
             await api.setGroupVolume(speakerName, volume);
-            const card = document.querySelector(`.speaker-card[data-speaker="${speakerName}"]`);
+            const escaped = (window.CSS && typeof window.CSS.escape === 'function')
+                ? window.CSS.escape(String(speakerName))
+                : String(speakerName);
+            const card = document.querySelector(`.speaker-card[data-speaker="${escaped}"]`);
             if (card) {
                 card.querySelector('.group-volume-value').textContent = volume;
             }
@@ -530,7 +547,10 @@ window.speakers = {
      * Updates the group display for a specific speaker card
      */
     updateSpeakerGroupDisplay(speakerName) {
-        const card = document.querySelector(`.speaker-card[data-speaker="${speakerName}"]`);
+        const escaped = (window.CSS && typeof window.CSS.escape === 'function')
+            ? window.CSS.escape(String(speakerName))
+            : String(speakerName);
+        const card = document.querySelector(`.speaker-card[data-speaker="${escaped}"]`);
         if (!card) return;
 
         const groupInfo = this.speakerGroups[speakerName];
@@ -545,7 +565,21 @@ window.speakers = {
                 card.classList.add('group-coordinator');
                 card.classList.remove('group-member');
                 const otherMembers = groupInfo.members.filter(m => m !== speakerName);
-                groupInfoDiv.innerHTML = `<span class="group-badge coordinator" style="background-color: ${groupInfo.color};">⬤ Group Leader</span> <span class="group-members">+ ${otherMembers.join(', ')}</span>`;
+
+                // Build DOM safely (speaker names should never be injected as HTML)
+                groupInfoDiv.innerHTML = '';
+                const badge = document.createElement('span');
+                badge.className = 'group-badge coordinator';
+                badge.style.backgroundColor = groupInfo.color;
+                badge.textContent = '⬤ Group Leader';
+
+                const members = document.createElement('span');
+                members.className = 'group-members';
+                members.textContent = `+ ${otherMembers.join(', ')}`;
+
+                groupInfoDiv.appendChild(badge);
+                groupInfoDiv.appendChild(document.createTextNode(' '));
+                groupInfoDiv.appendChild(members);
                 
                 // Show all controls for coordinator
                 card.querySelector('.speaker-track')?.style.removeProperty('display');
@@ -560,12 +594,25 @@ window.speakers = {
             } else {
                 card.classList.add('group-member');
                 card.classList.remove('group-coordinator');
-                groupInfoDiv.innerHTML = `<span class="group-badge member" style="border-color: ${groupInfo.color}; color: ${groupInfo.color};">◯ Grouped with ${groupInfo.coordinator}</span>`;
+
+                // Build DOM safely (speaker names should never be injected as HTML)
+                groupInfoDiv.innerHTML = '';
+                const badge = document.createElement('span');
+                badge.className = 'group-badge member';
+                badge.style.borderColor = groupInfo.color;
+                badge.style.color = groupInfo.color;
+                badge.textContent = `◯ Grouped with ${groupInfo.coordinator ?? ''}`;
+                groupInfoDiv.appendChild(badge);
                 
                 // Hide playback controls for group members (they're controlled by the leader)
-                card.querySelector('.speaker-track').style.display = 'none';
-                card.querySelector('.speaker-controls').style.display = 'none';
-                card.querySelector('.playmode-controls').style.display = 'none';
+                const trackEl = card.querySelector('.speaker-track');
+                if (trackEl) trackEl.style.display = 'none';
+
+                const controlsEl = card.querySelector('.speaker-controls');
+                if (controlsEl) controlsEl.style.display = 'none';
+
+                const playmodeEl = card.querySelector('.playmode-controls');
+                if (playmodeEl) playmodeEl.style.display = 'none';
             }
             groupInfoDiv.style.display = 'block';
         } else {
@@ -602,7 +649,10 @@ window.speakers = {
             await api.setShuffle(speakerName, newState);
             
             // Update button state
-            const card = document.querySelector(`.speaker-card[data-speaker="${speakerName}"]`);
+            const escaped = (window.CSS && typeof window.CSS.escape === 'function')
+                ? window.CSS.escape(String(speakerName))
+                : String(speakerName);
+            const card = document.querySelector(`.speaker-card[data-speaker="${escaped}"]`);
             if (card) {
                 const btn = card.querySelector('[data-control="shuffle"]');
                 btn?.classList.toggle('active', newState === 'on');
@@ -627,7 +677,10 @@ window.speakers = {
             await api.setRepeat(speakerName, nextMode);
             
             // Update button state
-            const card = document.querySelector(`.speaker-card[data-speaker="${speakerName}"]`);
+            const escaped = (window.CSS && typeof window.CSS.escape === 'function')
+                ? window.CSS.escape(String(speakerName))
+                : String(speakerName);
+            const card = document.querySelector(`.speaker-card[data-speaker="${escaped}"]`);
             if (card) {
                 const btn = card.querySelector('[data-control="repeat"]');
                 btn?.classList.toggle('active', nextMode !== 'off');

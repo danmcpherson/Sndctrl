@@ -108,9 +108,13 @@ window.favorites = {
             console.error('Failed to load favorites:', error);
             container.innerHTML = `
                 <div class="info-message error">
-                    <p>Error loading favorites: ${error.message}</p>
+                    <p class="js-favorites-load-error"></p>
                 </div>
             `;
+            const errEl = container.querySelector('.js-favorites-load-error');
+            if (errEl) {
+                errEl.textContent = `Error loading favorites: ${error?.message ?? String(error)}`;
+            }
         } finally {
             this.isLoadingFavorites = false;
         }
@@ -130,13 +134,18 @@ window.favorites = {
         card.innerHTML = `
             <div class="favorite-icon">♫</div>
             <div class="favorite-info">
-                <div class="favorite-name">${favorite.name}</div>
-                <div class="favorite-number">#${favorite.number}</div>
+                <div class="favorite-name"></div>
+                <div class="favorite-number"></div>
             </div>
             <button class="btn btn-primary btn-sm favorite-play-btn" title="Play on selected speaker">
                 ▶
             </button>
         `;
+
+        const nameEl = card.querySelector('.favorite-name');
+        if (nameEl) nameEl.textContent = toDisplayString(favorite.name);
+        const numberEl = card.querySelector('.favorite-number');
+        if (numberEl) numberEl.textContent = `#${toDisplayString(favorite.number)}`;
 
         card.querySelector('.favorite-play-btn').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -194,7 +203,7 @@ window.favorites = {
         modal.innerHTML = `
             <div class="modal-content" style="max-width: 400px;">
                 <div class="modal-header">
-                    <h3>${favorite.name}</h3>
+                    <h3 class="js-favorite-title"></h3>
                     <button class="modal-close">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -212,6 +221,9 @@ window.favorites = {
         `;
 
         document.body.appendChild(modal);
+
+        const titleEl = modal.querySelector('.js-favorite-title');
+        if (titleEl) titleEl.textContent = toDisplayString(favorite.name);
 
         modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
         modal.addEventListener('click', (e) => {
@@ -298,9 +310,13 @@ window.favorites = {
             console.error('Failed to load playlists:', error);
             container.innerHTML = `
                 <div class="info-message error">
-                    <p>Error loading playlists: ${error.message}</p>
+                    <p class="js-playlists-load-error"></p>
                 </div>
             `;
+            const errEl = container.querySelector('.js-playlists-load-error');
+            if (errEl) {
+                errEl.textContent = `Error loading playlists: ${error?.message ?? String(error)}`;
+            }
         } finally {
             this.isLoadingPlaylists = false;
         }
@@ -319,13 +335,16 @@ window.favorites = {
         card.innerHTML = `
             <div class="playlist-icon">☰</div>
             <div class="playlist-info">
-                <div class="playlist-name">${playlist.name}</div>
+                <div class="playlist-name"></div>
             </div>
             <div class="playlist-actions">
                 <button class="btn btn-icon btn-sm" title="Add to queue" data-action="queue">+</button>
                 <button class="btn btn-icon btn-sm" title="View tracks" data-action="view">⋯</button>
             </div>
         `;
+
+        const nameEl = card.querySelector('.playlist-name');
+        if (nameEl) nameEl.textContent = toDisplayString(playlist.name);
 
         card.querySelector('[data-action="queue"]').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -419,7 +438,7 @@ window.favorites = {
         modal.innerHTML = `
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>${playlist.name}</h3>
+                    <h3 class="js-playlist-title"></h3>
                     <button class="modal-close">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -429,6 +448,9 @@ window.favorites = {
         `;
 
         document.body.appendChild(modal);
+
+        const titleEl = modal.querySelector('.js-playlist-title');
+        if (titleEl) titleEl.textContent = toDisplayString(playlist.name);
 
         modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
         modal.addEventListener('click', (e) => {
@@ -443,21 +465,34 @@ window.favorites = {
             if (tracks.length === 0) {
                 body.innerHTML = '<p>No tracks in this playlist.</p>';
             } else {
-                body.innerHTML = `
-                    <div class="playlist-tracks-list">
-                        ${tracks.map(track => `
-                            <div class="playlist-track">
-                                <span class="track-number">${track.number}</span>
-                                <span class="track-name">${track.name}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
+                body.innerHTML = '<div class="playlist-tracks-list"></div>';
+                const list = body.querySelector('.playlist-tracks-list');
+                for (const track of tracks) {
+                    const row = document.createElement('div');
+                    row.className = 'playlist-track';
+
+                    const num = document.createElement('span');
+                    num.className = 'track-number';
+                    num.textContent = toDisplayString(track.number);
+
+                    const name = document.createElement('span');
+                    name.className = 'track-name';
+                    name.textContent = toDisplayString(track.name);
+
+                    row.appendChild(num);
+                    row.appendChild(name);
+                    list.appendChild(row);
+                }
             }
         } catch (error) {
-            modal.querySelector('.modal-body').innerHTML = `
-                <p class="error">Failed to load tracks: ${error.message}</p>
-            `;
+            const body = modal.querySelector('.modal-body');
+            if (body) {
+                body.innerHTML = '<p class="error js-playlist-tracks-error"></p>';
+                const errEl = body.querySelector('.js-playlist-tracks-error');
+                if (errEl) {
+                    errEl.textContent = `Failed to load tracks: ${error?.message ?? String(error)}`;
+                }
+            }
         }
     },
 
@@ -511,9 +546,13 @@ window.favorites = {
             console.error('Failed to load radio stations:', error);
             container.innerHTML = `
                 <div class="info-message error">
-                    <p>Error loading radio stations: ${error.message}</p>
+                    <p class="js-radio-load-error"></p>
                 </div>
             `;
+            const errEl = container.querySelector('.js-radio-load-error');
+            if (errEl) {
+                errEl.textContent = `Error loading radio stations: ${error?.message ?? String(error)}`;
+            }
         } finally {
             this.isLoadingRadio = false;
         }
@@ -532,12 +571,15 @@ window.favorites = {
         card.innerHTML = `
             <div class="radio-icon">📻</div>
             <div class="radio-info">
-                <div class="radio-name">${station.name}</div>
+                <div class="radio-name"></div>
             </div>
             <button class="btn btn-primary btn-sm radio-play-btn" title="Play">
                 ▶
             </button>
         `;
+
+        const nameEl = card.querySelector('.radio-name');
+        if (nameEl) nameEl.textContent = toDisplayString(station.name);
 
         card.querySelector('.radio-play-btn').addEventListener('click', (e) => {
             e.stopPropagation();

@@ -3,20 +3,65 @@
  */
 
 /**
- * Shows a toast notification
- * Shows a toast notification
+ * Coerces a value to a safe display string.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function toDisplayString(value) {
+    if (value === null || value === undefined) return '';
+    return String(value);
+}
+
+/**
+ * Restrict toast types to known CSS classes.
+ * @param {string} type
+ * @returns {'success'|'error'|'warning'}
+ */
+function normalizeToastType(type) {
+    const t = String(type || '').toLowerCase();
+    if (t === 'error' || t === 'warning' || t === 'success') return t;
+    return 'success';
+}
+
+/**
+ * Best-effort CSS attribute value escape for querySelector.
+ * Uses CSS.escape when available.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function cssEscape(value) {
+    const str = String(value ?? '');
+    if (window.CSS && typeof window.CSS.escape === 'function') {
+        return window.CSS.escape(str);
+    }
+    return str.replace(/[\\"']/g, '\\$&');
+}
+
+/**
+ * Shows a toast notification.
+ * @param {unknown} message
+ * @param {'success'|'error'|'warning'|string} [type='success']
  */
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
+    if (!container) {
+        console.warn('Toast container not found');
+        return;
+    }
+
+    const toastType = normalizeToastType(type);
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    
-    toast.innerHTML = `
-        <div class="toast-message">${message}</div>
-    `;
-    
+    toast.className = `toast ${toastType}`;
+
+    const msgEl = document.createElement('div');
+    msgEl.className = 'toast-message';
+    msgEl.textContent = toDisplayString(message);
+    toast.appendChild(msgEl);
+
     container.appendChild(toast);
-    
+
+    // Fade out then remove
+    toast.style.transition = 'opacity 0.3s ease';
     setTimeout(() => {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 300);
@@ -24,12 +69,16 @@ function showToast(message, type = 'success') {
 }
 
 /**
- * Updates the status indicator
+ * Updates the status indicator.
+ * @param {boolean} isConnected
+ * @param {string} [message]
  */
 function updateStatus(isConnected, message = '') {
     const indicator = document.getElementById('status-indicator');
+    if (!indicator) return;
     const statusText = indicator.querySelector('.status-text');
-    
+    if (!statusText) return;
+
     if (isConnected) {
         indicator.className = 'status-indicator connected';
         statusText.textContent = message || 'Connected';
@@ -50,7 +99,7 @@ function createSpeakerCard(speakerName) {
     card.innerHTML = `
         <div class="speaker-header">
             <div>
-                <h3 class="speaker-name">${speakerName}</h3>
+                <h3 class="speaker-name"></h3>
                 <div class="speaker-group-info" style="display: none;"></div>
             </div>
             <span class="speaker-status stopped">Stopped</span>
@@ -62,15 +111,15 @@ function createSpeakerCard(speakerName) {
         </div>
         
         <div class="speaker-controls">
-            <button class="control-btn" onclick="speakers.previous('${speakerName}')" title="Previous">⏮︎</button>
-            <button class="control-btn primary" onclick="speakers.playPause('${speakerName}')" title="Play/Pause">▶</button>
-            <button class="control-btn" onclick="speakers.next('${speakerName}')" title="Next">⏭︎</button>
-            <button class="control-btn" onclick="speakers.toggleMute('${speakerName}')" title="Mute">◖</button>
+            <button class="control-btn" data-action="previous" type="button" title="Previous">⏮︎</button>
+            <button class="control-btn primary" data-action="playPause" type="button" title="Play/Pause">▶</button>
+            <button class="control-btn" data-action="next" type="button" title="Next">⏭︎</button>
+            <button class="control-btn" data-action="mute" type="button" title="Mute">◖</button>
         </div>
         
         <!-- Play Mode Controls (Phase 2) -->
         <div class="playmode-controls">
-            <button class="control-btn small playmode-btn" data-control="shuffle" onclick="speakers.toggleShuffle('${speakerName}')" title="Shuffle">
+            <button class="control-btn small playmode-btn" data-control="shuffle" data-action="shuffle" type="button" title="Shuffle">
                 <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="16 3 21 3 21 8"></polyline>
                     <line x1="4" y1="20" x2="21" y2="3"></line>
@@ -79,7 +128,7 @@ function createSpeakerCard(speakerName) {
                     <line x1="4" y1="4" x2="9" y2="9"></line>
                 </svg>
             </button>
-            <button class="control-btn small playmode-btn" data-control="repeat" onclick="speakers.cycleRepeat('${speakerName}')" title="Repeat">
+            <button class="control-btn small playmode-btn" data-control="repeat" data-action="repeat" type="button" title="Repeat">
                 <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="17 1 21 5 17 9"></polyline>
                     <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
@@ -87,13 +136,13 @@ function createSpeakerCard(speakerName) {
                     <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
                 </svg>
             </button>
-            <button class="control-btn small" onclick="speakers.showSleepTimer('${speakerName}')" title="Sleep Timer">
+            <button class="control-btn small" data-action="sleep" type="button" title="Sleep Timer">
                 <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
             </button>
-            <button class="control-btn small" onclick="speakers.showGroupMenu('${speakerName}')" title="Grouping">
+            <button class="control-btn small" data-action="group" type="button" title="Grouping">
                 <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="3" width="7" height="7"></rect>
                     <rect x="14" y="3" width="7" height="7"></rect>
@@ -116,7 +165,7 @@ function createSpeakerCard(speakerName) {
                 <span class="group-volume-value">--</span>
             </div>
             <input type="range" class="group-volume-slider" min="0" max="100" value="50" 
-                   oninput="speakers.setGroupVolume('${speakerName}', this.value)">
+                     >
         </div>
         
         <div class="volume-control">
@@ -125,9 +174,53 @@ function createSpeakerCard(speakerName) {
                 <span class="volume-value">--</span>
             </div>
             <input type="range" class="volume-slider" min="0" max="100" value="50" 
-                   oninput="speakers.setVolume('${speakerName}', this.value)">
+                   >
         </div>
     `;
+
+    // Set speaker name safely
+    const nameEl = card.querySelector('.speaker-name');
+    if (nameEl) {
+        nameEl.textContent = toDisplayString(speakerName);
+    }
+
+    // Attach event handlers (avoids inline onclick and string interpolation)
+    const actions = {
+        previous: () => window.speakers?.previous?.(speakerName),
+        playPause: () => window.speakers?.playPause?.(speakerName),
+        next: () => window.speakers?.next?.(speakerName),
+        mute: () => window.speakers?.toggleMute?.(speakerName),
+        shuffle: () => window.speakers?.toggleShuffle?.(speakerName),
+        repeat: () => window.speakers?.cycleRepeat?.(speakerName),
+        sleep: () => window.speakers?.showSleepTimer?.(speakerName),
+        group: () => window.speakers?.showGroupMenu?.(speakerName)
+    };
+
+    card.querySelectorAll('[data-action]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            const fn = action ? actions[action] : null;
+            if (typeof fn === 'function') fn();
+        });
+    });
+
+    const volumeSlider = card.querySelector('.volume-slider');
+    if (volumeSlider) {
+        volumeSlider.addEventListener('input', (e) => {
+            const value = Number(e.target.value);
+            if (!Number.isFinite(value) || value < 0 || value > 100) return;
+            window.speakers?.setVolume?.(speakerName, value);
+        });
+    }
+
+    const groupVolumeSlider = card.querySelector('.group-volume-slider');
+    if (groupVolumeSlider) {
+        groupVolumeSlider.addEventListener('input', (e) => {
+            const value = Number(e.target.value);
+            if (!Number.isFinite(value) || value < 0 || value > 100) return;
+            window.speakers?.setGroupVolume?.(speakerName, value);
+        });
+    }
     
     return card;
 }
@@ -139,52 +232,80 @@ function createMacroCard(macro) {
     const card = document.createElement('div');
     card.className = `macro-card ${macro.isFavorite ? 'favorite' : ''}`;
     card.dataset.macroName = macro.name;
-    
-    const categoryHtml = macro.category 
-        ? `<span class="macro-category">${macro.category}</span>` 
-        : '';
-    
-    const descriptionHtml = macro.description 
-        ? `<p class="macro-description">${macro.description}</p>` 
-        : '';
-    
-    const parametersInfo = macro.parameters && macro.parameters.length > 0
-        ? `<small style="color: var(--color-gray-600); display: block; margin-bottom: 8px;">
-             Parameters: ${macro.parameters.length}
-           </small>`
-        : '';
-    
+
     card.innerHTML = `
         <div class="macro-header">
             <div class="macro-header-content">
-                <h3 class="macro-name">${macro.name}</h3>
-                ${categoryHtml}
+                <h3 class="macro-name"></h3>
+                <span class="macro-category" style="display: none;"></span>
             </div>
-            <button class="macro-copy-btn" onclick="macros.copyUrl('${macro.name}')" title="Copy Macro Run Url">
+            <button class="macro-copy-btn" type="button" title="Copy Macro Run Url">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
             </button>
         </div>
-        ${descriptionHtml}
-        ${parametersInfo}
-        <div class="macro-definition">${macro.definition}</div>
+        <p class="macro-description" style="display: none;"></p>
+        <small class="macro-parameters" style="color: var(--color-gray-600); display: none; margin-bottom: 8px;"></small>
+        <div class="macro-definition"></div>
         <div class="macro-actions-bar">
-            <button class="btn btn-primary btn-sm" onclick="macros.execute('${macro.name}')">
-                Run
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="macros.edit('${macro.name}')">
-                Edit
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="macros.duplicate('${macro.name}')">
-                Duplicate
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="macros.delete('${macro.name}')">
-                Delete
-            </button>
+            <button class="btn btn-primary btn-sm" type="button" data-action="run">Run</button>
+            <button class="btn btn-secondary btn-sm" type="button" data-action="edit">Edit</button>
+            <button class="btn btn-secondary btn-sm" type="button" data-action="duplicate">Duplicate</button>
+            <button class="btn btn-secondary btn-sm" type="button" data-action="delete">Delete</button>
         </div>
     `;
+
+    const nameEl = card.querySelector('.macro-name');
+    if (nameEl) nameEl.textContent = toDisplayString(macro.name);
+
+    const categoryEl = card.querySelector('.macro-category');
+    if (categoryEl) {
+        if (macro.category) {
+            categoryEl.textContent = toDisplayString(macro.category);
+            categoryEl.style.display = '';
+        } else {
+            categoryEl.style.display = 'none';
+        }
+    }
+
+    const descriptionEl = card.querySelector('.macro-description');
+    if (descriptionEl) {
+        if (macro.description) {
+            descriptionEl.textContent = toDisplayString(macro.description);
+            descriptionEl.style.display = '';
+        } else {
+            descriptionEl.style.display = 'none';
+        }
+    }
+
+    const paramsEl = card.querySelector('.macro-parameters');
+    if (paramsEl) {
+        const count = Array.isArray(macro.parameters) ? macro.parameters.length : 0;
+        if (count > 0) {
+            paramsEl.textContent = `Parameters: ${count}`;
+            paramsEl.style.display = 'block';
+        } else {
+            paramsEl.style.display = 'none';
+        }
+    }
+
+    const defEl = card.querySelector('.macro-definition');
+    if (defEl) defEl.textContent = toDisplayString(macro.definition);
+
+    const copyBtn = card.querySelector('.macro-copy-btn');
+    copyBtn?.addEventListener('click', () => window.macros?.copyUrl?.(macro.name));
+
+    card.querySelectorAll('[data-action]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            if (action === 'run') window.macros?.execute?.(macro.name);
+            if (action === 'edit') window.macros?.edit?.(macro.name);
+            if (action === 'duplicate') window.macros?.duplicate?.(macro.name);
+            if (action === 'delete') window.macros?.delete?.(macro.name);
+        });
+    });
     
     return card;
 }
@@ -194,6 +315,7 @@ function createMacroCard(macro) {
  */
 function toggleMacroModal(show) {
     const modal = document.getElementById('macro-editor-modal');
+    if (!modal) return;
     if (show) {
         modal.classList.add('active');
     } else {
@@ -214,9 +336,15 @@ function showConfirmModal(message, title = 'Confirm Action', confirmText = 'Conf
         const titleEl = document.getElementById('confirm-modal-title');
         const messageEl = document.getElementById('confirm-modal-message');
         const confirmBtn = document.getElementById('confirm-modal-confirm-btn');
+
+        if (!modal || !titleEl || !messageEl || !confirmBtn) {
+            console.warn('Confirm modal elements not found');
+            resolve(false);
+            return;
+        }
         
         titleEl.textContent = title;
-        messageEl.textContent = message;
+        messageEl.textContent = toDisplayString(message);
         confirmBtn.textContent = confirmText;
         
         // Show modal
@@ -238,6 +366,8 @@ function showConfirmModal(message, title = 'Confirm Action', confirmText = 'Conf
         const cleanup = () => {
             modal.classList.remove('active');
             confirmBtn.removeEventListener('click', handleConfirm);
+            // Avoid dangling global handler if something calls it later
+            window.hideConfirmModal = () => {};
         };
         
         // Set up event listeners
@@ -314,9 +444,10 @@ function truncateText(text, maxLength = 50) {
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
+        const context = this;
         const later = () => {
             clearTimeout(timeout);
-            func(...args);
+            func.apply(context, args);
         };
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
@@ -380,17 +511,24 @@ class SearchableDropdown {
     }
     
     renderOptions() {
-        if (this.options.length === 0) {
-            this.optionsContainer.innerHTML = '<div class="custom-select-empty">No options available</div>';
+        this.optionsContainer.innerHTML = '';
+
+        if (!Array.isArray(this.options) || this.options.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'custom-select-empty';
+            empty.textContent = 'No options available';
+            this.optionsContainer.appendChild(empty);
             return;
         }
-        
-        this.optionsContainer.innerHTML = this.options.map(opt => `
-            <div class="custom-select-option" data-value="${opt.value}">
-                ${opt.label}
-            </div>
-        `).join('');
-        
+
+        for (const opt of this.options) {
+            const optionEl = document.createElement('div');
+            optionEl.className = 'custom-select-option';
+            optionEl.dataset.value = String(opt?.value ?? '');
+            optionEl.textContent = toDisplayString(opt?.label);
+            this.optionsContainer.appendChild(optionEl);
+        }
+
         this.updateSelectedOption();
     }
     
@@ -411,9 +549,10 @@ class SearchableDropdown {
     }
     
     updateSelectedOption() {
+        const current = this.value === null || this.value === undefined ? null : String(this.value);
         const options = this.optionsContainer.querySelectorAll('.custom-select-option');
         options.forEach(opt => {
-            if (opt.dataset.value === this.value) {
+            if (current !== null && opt.dataset.value === current) {
                 opt.classList.add('selected');
             } else {
                 opt.classList.remove('selected');
@@ -465,8 +604,13 @@ class SearchableDropdown {
                             customOption.className = 'custom-select-option custom-select-option-custom';
                             this.optionsContainer.prepend(customOption);
                         }
-                        customOption.innerHTML = `<span style="font-weight: 600;">✨ Use custom value:</span> "${e.target.value}"`;
-                        customOption.dataset.value = e.target.value;
+                        customOption.innerHTML = '';
+                        const label = document.createElement('span');
+                        label.style.fontWeight = '600';
+                        label.textContent = '✨ Use custom value:';
+                        customOption.appendChild(label);
+                        customOption.appendChild(document.createTextNode(` "${e.target.value}"`));
+                        customOption.dataset.value = String(e.target.value ?? '');
                         customOption.classList.remove('hidden');
                         hasVisible = true;
                     } else if (customOption) {

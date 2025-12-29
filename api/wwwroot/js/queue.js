@@ -82,9 +82,13 @@ window.queue = {
             console.error('Failed to load queue:', error);
             container.innerHTML = `
                 <div class="info-message error">
-                    <p>Error loading queue: ${error.message}</p>
+                    <p class="js-queue-load-error"></p>
                 </div>
             `;
+            const errEl = container.querySelector('.js-queue-load-error');
+            if (errEl) {
+                errEl.textContent = `Error loading queue: ${error?.message ?? String(error)}`;
+            }
         }
     },
 
@@ -132,16 +136,32 @@ window.queue = {
         const artist = track.artist || '';
 
         el.innerHTML = `
-            <div class="queue-track-position">${position}</div>
+            <div class="queue-track-position"></div>
             <div class="queue-track-info">
-                <div class="queue-track-name">${title}</div>
-                ${artist ? `<div class="queue-track-artist">${artist}</div>` : ''}
+                <div class="queue-track-name"></div>
+                <div class="queue-track-artist" style="display: none;"></div>
             </div>
             <div class="queue-track-actions">
                 <button class="btn btn-icon btn-sm" title="Play this track" data-action="play">▶</button>
                 <button class="btn btn-icon btn-sm" title="Remove from queue" data-action="remove">✕</button>
             </div>
         `;
+
+        const posEl = el.querySelector('.queue-track-position');
+        if (posEl) posEl.textContent = toDisplayString(position);
+
+        const titleEl = el.querySelector('.queue-track-name');
+        if (titleEl) titleEl.textContent = toDisplayString(title);
+
+        const artistEl = el.querySelector('.queue-track-artist');
+        if (artistEl) {
+            if (artist) {
+                artistEl.textContent = toDisplayString(artist);
+                artistEl.style.display = '';
+            } else {
+                artistEl.style.display = 'none';
+            }
+        }
 
         el.querySelector('[data-action="play"]').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -375,11 +395,9 @@ window.queue = {
      */
     showEmptyState(message) {
         const container = document.getElementById('queue-tracks');
-        container.innerHTML = `
-            <div class="info-message">
-                <p>${message}</p>
-            </div>
-        `;
+        container.innerHTML = '<div class="info-message"><p class="js-queue-empty"></p></div>';
+        const msgEl = container.querySelector('.js-queue-empty');
+        if (msgEl) msgEl.textContent = toDisplayString(message);
     },
 
     /**

@@ -12,6 +12,18 @@ public class SonosCommandService
     private readonly SocoCliService _socoCliService;
     private readonly ILogger<SonosCommandService> _logger;
 
+    private static async Task<string> ReadBodySafeAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            return await response.Content.ReadAsStringAsync();
+        }
+        catch
+        {
+            return "<unable to read response body>";
+        }
+    }
+
     public SonosCommandService(
         HttpClient httpClient,
         SocoCliService socoCliService,
@@ -31,8 +43,19 @@ public class SonosCommandService
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_socoCliService.ServerUrl}/speakers");
-            response.EnsureSuccessStatusCode();
+            var url = $"{_socoCliService.ServerUrl}/speakers";
+            var response = await _httpClient.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await ReadBodySafeAsync(response);
+                _logger.LogError(
+                    "soco-cli request failed: GET {Url} => {StatusCode} {ReasonPhrase}. Body: {Body}",
+                    url,
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    body);
+                return new List<string>();
+            }
 
             var content = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<JsonElement>(content);
@@ -63,8 +86,19 @@ public class SonosCommandService
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_socoCliService.ServerUrl}/rediscover");
-            response.EnsureSuccessStatusCode();
+            var url = $"{_socoCliService.ServerUrl}/rediscover";
+            var response = await _httpClient.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await ReadBodySafeAsync(response);
+                _logger.LogError(
+                    "soco-cli request failed: GET {Url} => {StatusCode} {ReasonPhrase}. Body: {Body}",
+                    url,
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    body);
+                return new List<string>();
+            }
 
             var content = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<JsonElement>(content);
@@ -106,7 +140,24 @@ public class SonosCommandService
             _logger.LogInformation("Executing command: {Url}", url);
 
             var response = await _httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await ReadBodySafeAsync(response);
+                _logger.LogError(
+                    "soco-cli request failed: GET {Url} => {StatusCode} {ReasonPhrase}. Body: {Body}",
+                    url,
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    body);
+                return new SocoCliResponse
+                {
+                    Speaker = speaker,
+                    Action = action,
+                    Args = args,
+                    ExitCode = (int)response.StatusCode,
+                    ErrorMsg = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}"
+                };
+            }
 
             var content = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<SocoCliResponse>(content, new JsonSerializerOptions

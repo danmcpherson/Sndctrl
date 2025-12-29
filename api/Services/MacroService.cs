@@ -17,6 +17,18 @@ public class MacroService
     private readonly string _macrosFilePath;
     private readonly string _metadataFilePath;
 
+    private static async Task<string> ReadBodySafeAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            return await response.Content.ReadAsStringAsync();
+        }
+        catch
+        {
+            return "<unable to read response body>";
+        }
+    }
+
     public MacroService(
         ILogger<MacroService> logger,
         IConfiguration configuration,
@@ -339,7 +351,17 @@ public class MacroService
             _logger.LogInformation("Executing macro: {Url}", url);
 
             var response = await _httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await ReadBodySafeAsync(response);
+                _logger.LogError(
+                    "soco-cli request failed: GET {Url} => {StatusCode} {ReasonPhrase}. Body: {Body}",
+                    url,
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    body);
+                response.EnsureSuccessStatusCode();
+            }
 
             var content = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<JsonElement>(content);
@@ -360,8 +382,19 @@ public class MacroService
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_socoCliService.ServerUrl}/macros/reload");
-            response.EnsureSuccessStatusCode();
+            var url = $"{_socoCliService.ServerUrl}/macros/reload";
+            var response = await _httpClient.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await ReadBodySafeAsync(response);
+                _logger.LogError(
+                    "soco-cli request failed: GET {Url} => {StatusCode} {ReasonPhrase}. Body: {Body}",
+                    url,
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    body);
+                return false;
+            }
             _logger.LogInformation("Reloaded macros in soco-cli server");
             return true;
         }
