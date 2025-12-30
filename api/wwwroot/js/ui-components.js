@@ -13,6 +13,16 @@ function toDisplayString(value) {
 }
 
 /**
+ * Formats a macro name for display by replacing underscores with spaces.
+ * @param {string} name - The macro name
+ * @returns {string} The formatted display name
+ */
+function formatMacroName(name) {
+    if (!name) return '';
+    return String(name).replace(/_/g, ' ');
+}
+
+/**
  * Restrict toast types to known CSS classes.
  * @param {string} type
  * @returns {'success'|'error'|'warning'}
@@ -258,7 +268,7 @@ function createMacroCard(macro) {
     `;
 
     const nameEl = card.querySelector('.macro-name');
-    if (nameEl) nameEl.textContent = toDisplayString(macro.name);
+    if (nameEl) nameEl.textContent = formatMacroName(macro.name);
 
     const categoryEl = card.querySelector('.macro-category');
     if (categoryEl) {

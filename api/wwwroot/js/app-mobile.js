@@ -140,7 +140,7 @@ window.mobileApp = {
         container.innerHTML = this.macros.map(macro => `
             <div class="macro-item" data-macro="${this.escapeHtml(macro.name)}" onclick="mobileApp.runMacro('${this.escapeJs(macro.name)}')">
                 <div class="macro-info">
-                    <div class="macro-name">${this.escapeHtml(macro.name)}</div>
+                    <div class="macro-name">${this.escapeHtml(macro.name.replace(/_/g, ' '))}</div>
                     ${macro.description ? `<div class="macro-description">${this.escapeHtml(macro.description)}</div>` : ''}
                 </div>
                 <div class="macro-run-btn">
