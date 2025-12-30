@@ -63,6 +63,7 @@ jobs:
             -p:PublishSingleFile=true \
             -p:DebugType=embedded \
             -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:InformationalVersion=${{ env.VERSION }} \
             -o publish/${{ env.RID }}
 
       - name: Install nfpm

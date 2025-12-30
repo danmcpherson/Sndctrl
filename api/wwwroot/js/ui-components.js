@@ -681,6 +681,13 @@ class SearchableDropdown {
     }
     
     openDropdown() {
+        // Position dropdown using fixed positioning to escape overflow clipping
+        const triggerRect = this.trigger.getBoundingClientRect();
+        this.dropdown.style.position = 'fixed';
+        this.dropdown.style.top = `${triggerRect.bottom + 4}px`;
+        this.dropdown.style.left = `${triggerRect.left}px`;
+        this.dropdown.style.width = `${triggerRect.width}px`;
+        
         this.dropdown.classList.add('open');
         this.trigger.classList.add('active');
         this.searchInput.value = '';

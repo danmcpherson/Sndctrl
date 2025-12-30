@@ -46,14 +46,27 @@ window.speakers = {
 
     /**
      * Discovers speakers on the network
+     * @param {number} retryCount - Internal counter for automatic retries
      */
-    async discover() {
+    async discover(retryCount = 0) {
         const grid = document.getElementById('speakers-grid');
+        const maxRetries = 3;
+        const retryDelayMs = 1500;
+        
         grid.innerHTML = '<div class="loading-message"><div class="spinner"></div><p>Discovering speakers...</p></div>';
         updateStatus(false, 'Discovering...');
 
         try {
             const speakerNames = await api.getSpeakers();
+            
+            // If no speakers found and we haven't exceeded retries, automatically retry
+            if (speakerNames.length === 0 && retryCount < maxRetries) {
+                console.log(`No speakers found, retrying (${retryCount + 1}/${maxRetries})...`);
+                grid.innerHTML = `<div class="loading-message"><div class="spinner"></div><p>Discovering speakers... (attempt ${retryCount + 2})</p></div>`;
+                await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                return this.discover(retryCount + 1);
+            }
+            
             this.currentSpeakers = speakerNames;
             this.renderDiscoveryResult(speakerNames, {
                 toastMessage: `Found ${speakerNames.length} speaker${speakerNames.length !== 1 ? 's' : ''}`,
@@ -61,6 +74,15 @@ window.speakers = {
             });
         } catch (error) {
             console.error('Failed to discover speakers:', error);
+            
+            // On error, also retry if we haven't exceeded retries
+            if (retryCount < maxRetries) {
+                console.log(`Discovery error, retrying (${retryCount + 1}/${maxRetries})...`);
+                grid.innerHTML = `<div class="loading-message"><div class="spinner"></div><p>Discovering speakers... (attempt ${retryCount + 2})</p></div>`;
+                await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                return this.discover(retryCount + 1);
+            }
+            
             grid.innerHTML = `
                 <div class="info-message">
                     <p class="js-speakers-discover-error"></p>

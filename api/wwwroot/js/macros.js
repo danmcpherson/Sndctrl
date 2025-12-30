@@ -50,7 +50,7 @@ window.macros = {
             switch_to_tv: { label: 'Switch to TV', args: [] },
         },
         'Queue': {
-            play_from_queue: { label: 'Play from Queue', args: [{ name: 'track', type: 'text', placeholder: '# or empty for first', optional: true }] },
+            play_from_queue: { label: 'Play from Queue', args: [{ name: 'track', type: 'text', placeholder: 'Track #', default: '1', optional: true }] },
             clear_queue: { label: 'Clear Queue', args: [] },
             add_favourite_to_queue: { label: 'Add Favorite to Queue', args: [{ name: 'name', type: 'text', placeholder: 'Favorite name', quoted: true }] },
             add_playlist_to_queue: { label: 'Add Playlist to Queue', args: [{ name: 'name', type: 'text', placeholder: 'Playlist name', quoted: true }] },
@@ -486,7 +486,7 @@ window.macros = {
             let argsHtml = '';
             if (cmdConfig && cmdConfig.args.length > 0) {
                 argsHtml = cmdConfig.args.map((argDef, argIndex) => {
-                    const value = action.args[argIndex] || '';
+                    const value = action.args[argIndex] || argDef.default || '';
                     const optionalClass = argDef.optional ? 'optional' : '';
                     const argListId = `arg-list-${index}-${argIndex}`;
                     

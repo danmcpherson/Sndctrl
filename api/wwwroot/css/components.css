@@ -1686,15 +1686,12 @@ select.form-control.action-command {
 }
 
 .custom-select-dropdown {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    width: 100%;
+    position: fixed;
     background-color: var(--color-white);
     border: 1px solid var(--color-gray-200);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
-    z-index: 1000;
+    z-index: 99999;
     display: none;
     animation: fadeIn 0.2s ease;
 }
