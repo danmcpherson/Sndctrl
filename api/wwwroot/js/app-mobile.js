@@ -664,7 +664,4 @@ window.mobileApp = {
     }
 };
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    mobileApp.init();
-});
+// Note: init() is called from app.html after scripts are loaded with cache-busting
