@@ -1,4 +1,4 @@
-# 🔊 Sonos Sound Hub
+# 🔊 Sonos Sound Control
 
 **Take back control of your Sonos system.** A beautiful, self-hosted control panel that runs entirely on your local network—no cloud, no accounts, no subscriptions.
 
