@@ -22,9 +22,11 @@ class Speaker(CamelCaseModel):
     """Represents a Sonos speaker on the network."""
     
     name: str = ""
-    ip: str = ""
+    ip_address: str | None = None
+    model: str | None = None
     is_coordinator: bool = False
     group_name: str | None = None
+    group_members: list[str] = []
     volume: int | None = None
     is_muted: bool | None = None
     current_track: str | None = None
@@ -80,13 +82,23 @@ class ListItem(CamelCaseModel):
     name: str = ""
 
 
+class Favorite(CamelCaseModel):
+    """Represents a Sonos favorite."""
+    
+    id: str = ""
+    name: str = ""
+    album_art_uri: str | None = None
+
+
 class QueueItem(CamelCaseModel):
     """Represents a queue item with full track info."""
     
-    number: int
+    position: int = 0
+    number: int = 0  # Alias for position (backwards compat)
     title: str = ""
-    artist: str = ""
-    album: str = ""
+    artist: str | None = None
+    album: str | None = None
+    album_art_uri: str | None = None
     is_current: bool = False
 
 

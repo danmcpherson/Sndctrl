@@ -7,6 +7,7 @@ from .sonos import (
     SonosCommandRequest,
     TrackInfo,
     ListItem,
+    Favorite,
     QueueItem,
     ShareLinkRequest,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "SonosCommandRequest",
     "TrackInfo",
     "ListItem",
+    "Favorite",
     "QueueItem",
     "ShareLinkRequest",
     "Macro",

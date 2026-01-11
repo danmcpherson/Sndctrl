@@ -14,7 +14,7 @@ from .config import get_settings
 from .routers import macros as macros_router
 from .routers import sonos as sonos_router
 from .routers import voice as voice_router
-from .services import MacroService, SocoCliService, SonosCommandService
+from .services import MacroService, SocoCliService, SonosCommandService, SoCoService
 
 # Configure logging
 logging.basicConfig(
@@ -26,13 +26,14 @@ logger = logging.getLogger(__name__)
 # Global service instances
 _soco_cli_service: SocoCliService | None = None
 _command_service: SonosCommandService | None = None
+_soco_service: SoCoService | None = None
 _macro_service: MacroService | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan context manager."""
-    global _soco_cli_service, _command_service, _macro_service
+    global _soco_cli_service, _command_service, _soco_service, _macro_service
     
     settings = get_settings()
     logger.info("Starting Sound Control Python backend v%s", __version__)
@@ -40,14 +41,23 @@ async def lifespan(app: FastAPI):
     logger.info("Static files: %s", settings.wwwroot_path)
     
     # Initialize services
+    # SoCoService for direct SoCo library operations (discovery, playback, etc.)
+    _soco_service = SoCoService(settings)
+    
+    # SocoCliService only for macro execution (complex chained commands)
     _soco_cli_service = SocoCliService(settings)
     _command_service = SonosCommandService(settings, _soco_cli_service)
     _macro_service = MacroService(settings, _soco_cli_service)
     
     # Initialize routers with services
-    sonos_router.init_router(_soco_cli_service, _command_service)
+    sonos_router.init_router(_soco_cli_service, _command_service, _soco_service)
     macros_router.init_router(_macro_service)
     voice_router.init_router(settings)
+    
+    # Pre-discover speakers on startup
+    logger.info("Discovering Sonos speakers...")
+    speakers = await _soco_service.discover_speakers()
+    logger.info("Found %d speakers: %s", len(speakers), ", ".join(speakers))
     
     logger.info("Services initialized")
     

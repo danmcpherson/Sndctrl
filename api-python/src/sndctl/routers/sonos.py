@@ -1,4 +1,8 @@
-"""Sonos API router - /api/sonos/* endpoints."""
+"""Sonos API router - /api/sonos/* endpoints.
+
+Uses direct SoCo library for most operations (faster, more reliable).
+Falls back to soco-cli HTTP API only for complex operations like macros.
+"""
 
 import logging
 import re
@@ -14,7 +18,7 @@ from ..models import (
     SonosCommandRequest,
     Speaker,
 )
-from ..services import SocoCliService, SonosCommandService
+from ..services import SocoCliService, SonosCommandService, SoCoService
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +27,19 @@ router = APIRouter(prefix="/api/sonos", tags=["sonos"])
 # These will be set by the main app
 _soco_cli_service: SocoCliService | None = None
 _command_service: SonosCommandService | None = None
+_soco_service: SoCoService | None = None
 
 
-def init_router(soco_cli_service: SocoCliService, command_service: SonosCommandService) -> None:
+def init_router(
+    soco_cli_service: SocoCliService,
+    command_service: SonosCommandService,
+    soco_service: SoCoService,
+) -> None:
     """Initialize the router with services."""
-    global _soco_cli_service, _command_service
+    global _soco_cli_service, _command_service, _soco_service
     _soco_cli_service = soco_cli_service
     _command_service = command_service
+    _soco_service = soco_service
 
 
 def _get_soco_cli_service() -> SocoCliService:
@@ -44,6 +54,13 @@ def _get_command_service() -> SonosCommandService:
     if _command_service is None:
         raise RuntimeError("Services not initialized")
     return _command_service
+
+
+def _get_soco_service() -> SoCoService:
+    """Get the SoCo service."""
+    if _soco_service is None:
+        raise RuntimeError("Services not initialized")
+    return _soco_service
 
 
 # ========================================
@@ -76,26 +93,26 @@ async def stop_server() -> dict:
 
 
 # ========================================
-# Speaker Discovery
+# Speaker Discovery (uses SoCo directly)
 # ========================================
 
 
 @router.get("/speakers")
 async def get_speakers() -> list[str]:
-    """Get all discovered speakers."""
-    return await _get_command_service().get_speakers()
+    """Get all discovered speakers using SoCo library."""
+    return await _get_soco_service().discover_speakers()
 
 
 @router.post("/rediscover")
 async def rediscover_speakers() -> list[str]:
-    """Trigger speaker rediscovery."""
-    return await _get_command_service().rediscover_speakers()
+    """Trigger speaker rediscovery using SoCo library."""
+    return await _get_soco_service().discover_speakers(force=True)
 
 
 @router.get("/speakers/{speaker_name}")
 async def get_speaker_info(speaker_name: str) -> Speaker:
-    """Get detailed information about a speaker."""
-    return await _get_command_service().get_speaker_info(speaker_name)
+    """Get detailed information about a speaker using SoCo library."""
+    return await _get_soco_service().get_speaker_info(speaker_name)
 
 
 # ========================================
@@ -112,90 +129,93 @@ async def execute_command(request: SonosCommandRequest) -> SocoCliResponse:
 
 
 # ========================================
-# Playback Control
+# Playback Control (uses SoCo directly)
 # ========================================
 
 
 @router.post("/speakers/{speaker_name}/playpause")
-async def play_pause(speaker_name: str) -> SocoCliResponse:
-    """Toggle play/pause on a speaker."""
-    return await _get_command_service().execute_command(speaker_name, "pauseplay")
+async def play_pause(speaker_name: str) -> dict:
+    """Toggle play/pause on a speaker using SoCo library."""
+    speaker = await _get_soco_service().get_speaker_info(speaker_name)
+    if speaker.playback_state == "PLAYING":
+        success = await _get_soco_service().pause(speaker_name)
+    else:
+        success = await _get_soco_service().play(speaker_name)
+    return {"success": success}
 
 
 @router.post("/speakers/{speaker_name}/volume/{volume}")
-async def set_volume(speaker_name: str, volume: int) -> SocoCliResponse:
-    """Set the volume (0-100)."""
+async def set_volume(speaker_name: str, volume: int) -> dict:
+    """Set the volume (0-100) using SoCo library."""
     if volume < 0 or volume > 100:
         raise HTTPException(status_code=400, detail="Volume must be between 0 and 100")
-    return await _get_command_service().execute_command(speaker_name, "volume", str(volume))
+    success = await _get_soco_service().set_volume(speaker_name, volume)
+    return {"success": success}
 
 
 @router.get("/speakers/{speaker_name}/volume")
 async def get_volume(speaker_name: str) -> int:
-    """Get the current volume."""
-    result = await _get_command_service().execute_command(speaker_name, "volume")
-    if result.exit_code == 0:
-        try:
-            return int(result.result)
-        except ValueError:
-            pass
+    """Get the current volume using SoCo library."""
+    speaker = await _get_soco_service().get_speaker_info(speaker_name)
+    if speaker.volume is not None:
+        return speaker.volume
     raise HTTPException(status_code=500, detail="Failed to get volume")
 
 
 @router.post("/speakers/{speaker_name}/mute")
-async def toggle_mute(speaker_name: str) -> SocoCliResponse:
-    """Toggle mute on/off."""
-    # Get current mute state
-    current_state = await _get_command_service().execute_command(speaker_name, "mute")
-    new_state = "off" if current_state.result.lower() == "on" else "on"
-    return await _get_command_service().execute_command(speaker_name, "mute", new_state)
+async def toggle_mute(speaker_name: str) -> dict:
+    """Toggle mute on/off using SoCo library."""
+    speaker = await _get_soco_service().get_speaker_info(speaker_name)
+    new_state = not speaker.is_muted
+    success = await _get_soco_service().set_mute(speaker_name, new_state)
+    return {"success": success, "muted": new_state}
 
 
 @router.get("/speakers/{speaker_name}/track")
 async def get_current_track(speaker_name: str) -> dict:
-    """Get the current track info."""
-    result = await _get_command_service().execute_command(speaker_name, "track")
-    return {"track": result.result}
+    """Get the current track info using SoCo library."""
+    speaker = await _get_soco_service().get_speaker_info(speaker_name)
+    return {"track": speaker.current_track or ""}
 
 
 @router.post("/speakers/{speaker_name}/next")
-async def next_track(speaker_name: str) -> SocoCliResponse:
-    """Skip to the next track."""
-    return await _get_command_service().execute_command(speaker_name, "next")
+async def next_track(speaker_name: str) -> dict:
+    """Skip to the next track using SoCo library."""
+    success = await _get_soco_service().next_track(speaker_name)
+    return {"success": success}
 
 
 @router.post("/speakers/{speaker_name}/previous")
-async def previous_track(speaker_name: str) -> SocoCliResponse:
-    """Go to the previous track."""
-    return await _get_command_service().execute_command(speaker_name, "previous")
+async def previous_track(speaker_name: str) -> dict:
+    """Go to the previous track using SoCo library."""
+    success = await _get_soco_service().previous_track(speaker_name)
+    return {"success": success}
 
 
 # ========================================
-# Grouping
+# Grouping (uses SoCo directly)
 # ========================================
 
 
 @router.get("/groups")
 async def get_groups() -> dict:
-    """Get all speaker groups."""
-    speakers = await _get_command_service().get_speakers()
-    if not speakers:
-        return {"groups": []}
-    
-    result = await _get_command_service().execute_command(speakers[0], "groups")
-    return {"groups": result.result, "exitCode": result.exit_code}
+    """Get all speaker groups using SoCo library."""
+    groups = await _get_soco_service().get_groups()
+    return {"groups": groups}
 
 
 @router.post("/speakers/{speaker_name}/group/{coordinator_name}")
-async def group_speaker(speaker_name: str, coordinator_name: str) -> SocoCliResponse:
-    """Group a speaker with another (coordinator)."""
-    return await _get_command_service().execute_command(speaker_name, "group", coordinator_name)
+async def group_speaker(speaker_name: str, coordinator_name: str) -> dict:
+    """Group a speaker with another (coordinator) using SoCo library."""
+    success = await _get_soco_service().group_speakers(coordinator_name, speaker_name)
+    return {"success": success}
 
 
 @router.post("/speakers/{speaker_name}/ungroup")
-async def ungroup_speaker(speaker_name: str) -> SocoCliResponse:
-    """Ungroup a speaker from its group."""
-    return await _get_command_service().execute_command(speaker_name, "ungroup")
+async def ungroup_speaker(speaker_name: str) -> dict:
+    """Ungroup a speaker from its group using SoCo library."""
+    success = await _get_soco_service().ungroup_speaker(speaker_name)
+    return {"success": success}
 
 
 @router.post("/speakers/{speaker_name}/party")
@@ -389,20 +409,20 @@ def _parse_queue_list(output: str | None) -> list[QueueItem]:
 
 @router.get("/favorites")
 async def get_favorites() -> dict:
-    """Get all Sonos favorites."""
-    speakers = await _get_command_service().get_speakers()
+    """Get all Sonos favorites using SoCo library."""
+    speakers = await _get_soco_service().discover_speakers()
     if not speakers:
         return {"favorites": []}
     
-    result = await _get_command_service().execute_command(speakers[0], "list_favs")
-    favorites = _parse_numbered_list(result.result)
-    return {"favorites": [f.model_dump(by_alias=True) for f in favorites], "raw": result.result, "exitCode": result.exit_code}
+    favorites = await _get_soco_service().get_favorites(speakers[0])
+    return {"favorites": [f.model_dump(by_alias=True) for f in favorites]}
 
 
 @router.post("/speakers/{speaker_name}/play-favorite/{favorite_name}")
-async def play_favorite(speaker_name: str, favorite_name: str) -> SocoCliResponse:
-    """Play a favorite by name."""
-    return await _get_command_service().execute_command(speaker_name, "play_favourite", favorite_name)
+async def play_favorite(speaker_name: str, favorite_name: str) -> dict:
+    """Play a favorite by name using SoCo library."""
+    success = await _get_soco_service().play_favorite(speaker_name, favorite_name)
+    return {"success": success}
 
 
 @router.post("/speakers/{speaker_name}/play-favorite-number/{number}")
@@ -460,16 +480,9 @@ async def play_radio_station(speaker_name: str, station_name: str) -> SocoCliRes
 
 @router.get("/speakers/{speaker_name}/queue")
 async def get_queue(speaker_name: str) -> dict:
-    """Get the current queue."""
-    result = await _get_command_service().execute_command(speaker_name, "list_queue")
-    
-    # soco-cli can intermittently return an empty body; retry once if we got an empty result with success
-    if result.exit_code == 0 and not result.result.strip():
-        logger.warning("list_queue returned empty result for %s, retrying", speaker_name)
-        result = await _get_command_service().execute_command(speaker_name, "list_queue")
-    
-    tracks = _parse_queue_list(result.result)
-    return {"tracks": [t.model_dump(by_alias=True) for t in tracks], "raw": result.result, "exitCode": result.exit_code}
+    """Get the current queue using SoCo library."""
+    queue = await _get_soco_service().get_queue(speaker_name)
+    return {"tracks": [t.model_dump(by_alias=True) for t in queue]}
 
 
 @router.get("/speakers/{speaker_name}/queue/length")
