@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     data_directory: str = "data"
     
     # soco-cli HTTP API settings
-    soco_cli_port: int = 8000
+    soco_cli_port: int = 8001
     soco_cli_executable_path: str | None = None
     soco_cli_use_local_cache: bool = False
     
