@@ -1296,6 +1296,47 @@ details[open] .individual-volumes-summary .expand-icon {
     gap: var(--spacing-sm);
 }
 
+.voice-conversation.hidden {
+    display: none;
+}
+
+/* Voice Disabled State */
+.voice-disabled {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--spacing-xl);
+    flex: 1;
+}
+
+.voice-disabled.visible {
+    display: flex;
+}
+
+.voice-disabled-icon {
+    width: 64px;
+    height: 64px;
+    color: var(--color-gray-400);
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+}
+
+.voice-disabled h3 {
+    margin: 0 0 var(--spacing-xs);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--color-gray-500);
+}
+
+.voice-disabled p {
+    margin: 0;
+    color: var(--color-gray-500);
+    font-size: 14px;
+    max-width: 300px;
+}
+
 /* Welcome Screen */
 .voice-welcome {
     display: flex;

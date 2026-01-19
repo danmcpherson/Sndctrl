@@ -48,8 +48,10 @@ window.voiceAssistant = {
      * Check if voice control is configured
      */
     async checkStatus() {
+        console.log('Voice: Checking status...');
         try {
             const response = await fetch('/api/voice/status');
+            console.log('Voice: Status response received, status:', response.status);
             
             // Check if response is OK and is JSON before parsing
             if (!response.ok) {
@@ -62,6 +64,9 @@ window.voiceAssistant = {
             }
             
             const status = await response.json();
+            
+            // Log the server response for debugging
+            console.log('Voice status response:', status);
             
             // Store the status for later use
             this.configMode = status.mode || 'none';
@@ -78,6 +83,16 @@ window.voiceAssistant = {
             const voiceButton = document.getElementById('voice-button');
             const serverModeIndicator = document.getElementById('voice-server-mode');
             const subscribePanel = document.getElementById('voice-subscribe');
+            const disabledPanel = document.getElementById('voice-disabled');
+            
+            // Log element availability for debugging
+            console.log('Voice UI elements:', {
+                conversationPanel: !!conversationPanel,
+                controlsPanel: !!controlsPanel,
+                voiceButton: !!voiceButton,
+                disabledPanel: !!disabledPanel,
+                settingsBtn: !!settingsBtn
+            });
             
             // Hide all optional panels first
             banner?.classList.add('hidden');
@@ -87,13 +102,17 @@ window.voiceAssistant = {
             settingsBtn?.classList.add('hidden');
             subscribePanel?.classList.add('hidden');
             serverModeIndicator?.classList.add('hidden');
+            disabledPanel?.classList.remove('visible');
             
             if (!status.configured) {
-                // Not configured - hide everything, show disabled state
+                console.log('Voice: Not configured - showing disabled state');
+                // Not configured - show disabled state
                 conversationPanel?.classList.add('hidden');
                 if (controlsPanel) controlsPanel.style.display = 'none';
                 voiceButton?.classList.add('disabled');
+                disabledPanel?.classList.add('visible');
             } else if (!status.enabled) {
+                console.log('Voice: Configured but not enabled - showing subscribe panel');
                 // Configured but not subscribed - show subscribe prompt
                 conversationPanel?.classList.add('hidden');
                 if (controlsPanel) controlsPanel.style.display = 'none';
@@ -112,10 +131,12 @@ window.voiceAssistant = {
                     }
                 }
             } else {
+                console.log('Voice: Configured and enabled - showing main interface');
                 // Configured and enabled - show main interface
                 conversationPanel?.classList.remove('hidden');
                 if (controlsPanel) controlsPanel.style.display = '';
                 voiceButton?.classList.remove('disabled');
+                settingsBtn?.classList.remove('hidden');
                 
                 // Show server mode indicator if connected via server
                 if (status.mode === 'server' && serverModeIndicator) {
@@ -128,7 +149,7 @@ window.voiceAssistant = {
         } catch (error) {
             console.error('Failed to check voice status:', error);
             
-            // On error, hide everything and disable voice
+            // On error, show disabled state
             const setupPanel = document.getElementById('voice-setup');
             const settingsPanel = document.getElementById('voice-settings');
             const settingsOverlay = document.getElementById('voice-settings-overlay');
@@ -137,6 +158,7 @@ window.voiceAssistant = {
             const controlsPanel = document.querySelector('.voice-controls');
             const voiceButton = document.getElementById('voice-button');
             const subscribePanel = document.getElementById('voice-subscribe');
+            const disabledPanel = document.getElementById('voice-disabled');
             
             setupPanel?.classList.add('hidden');
             settingsPanel?.classList.add('hidden');
@@ -146,6 +168,7 @@ window.voiceAssistant = {
             conversationPanel?.classList.add('hidden');
             if (controlsPanel) controlsPanel.style.display = 'none';
             voiceButton?.classList.add('disabled');
+            disabledPanel?.classList.add('visible');
             
             return false;
         }
