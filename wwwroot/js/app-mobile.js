@@ -60,34 +60,52 @@ window.mobileApp = {
     /**
      * Fix iOS scroll freeze when overscrolling at boundaries
      * iOS locks scrolling during rubber-band bounce animation
+     * Also sets up collapsing header on scroll
      */
     setupIOSScrollFix() {
-        const scrollContainer = document.querySelector('.app-content');
-        if (!scrollContainer) return;
+        // Listen on all tab-content elements for scroll events
+        const tabContents = document.querySelectorAll('.tab-content');
+        const header = document.querySelector('.app-header-mobile');
 
-        let lastY = 0;
+        tabContents.forEach(tabContent => {
+            let lastY = 0;
+            
+            tabContent.addEventListener('touchstart', (e) => {
+                lastY = e.touches[0].clientY;
+            }, { passive: true });
 
-        scrollContainer.addEventListener('touchstart', (e) => {
-            lastY = e.touches[0].clientY;
-        }, { passive: true });
+            tabContent.addEventListener('touchmove', (e) => {
+                const currentY = e.touches[0].clientY;
+                const scrollTop = tabContent.scrollTop;
+                const scrollHeight = tabContent.scrollHeight;
+                const clientHeight = tabContent.clientHeight;
+                const isAtTop = scrollTop <= 0;
+                const isAtBottom = scrollTop + clientHeight >= scrollHeight;
+                const isScrollingUp = currentY > lastY;
+                const isScrollingDown = currentY < lastY;
 
-        scrollContainer.addEventListener('touchmove', (e) => {
-            const currentY = e.touches[0].clientY;
-            const scrollTop = scrollContainer.scrollTop;
-            const scrollHeight = scrollContainer.scrollHeight;
-            const clientHeight = scrollContainer.clientHeight;
-            const isAtTop = scrollTop <= 0;
-            const isAtBottom = scrollTop + clientHeight >= scrollHeight;
-            const isScrollingUp = currentY > lastY;
-            const isScrollingDown = currentY < lastY;
+                // Prevent overscroll at boundaries to avoid iOS freeze
+                if ((isAtTop && isScrollingUp) || (isAtBottom && isScrollingDown)) {
+                    e.preventDefault();
+                }
 
-            // Prevent overscroll at boundaries to avoid iOS freeze
-            if ((isAtTop && isScrollingUp) || (isAtBottom && isScrollingDown)) {
-                e.preventDefault();
-            }
+                lastY = currentY;
+            }, { passive: false });
 
-            lastY = currentY;
-        }, { passive: false });
+            // Collapsing header on scroll
+            tabContent.addEventListener('scroll', () => {
+                const scrollTop = tabContent.scrollTop;
+                
+                if (header) {
+                    // Add compact class when scrolled down more than 20px
+                    if (scrollTop > 20) {
+                        header.classList.add('compact');
+                    } else {
+                        header.classList.remove('compact');
+                    }
+                }
+            }, { passive: true });
+        });
     },
 
     /**

@@ -1,6 +1,26 @@
 /* Mobile App Styles */
 
 /* ========================================
+   CSS Custom Properties for Layout
+   ======================================== */
+:root {
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: env(safe-area-inset-left, 0px);
+    --safe-area-right: env(safe-area-inset-right, 0px);
+    --header-height: 56px;
+    --tab-bar-height: 56px;
+    --content-padding: 10px;
+}
+
+/* Smaller padding on very small screens */
+@media (max-width: 375px) {
+    :root {
+        --content-padding: 8px;
+    }
+}
+
+/* ========================================
    Standalone Mode (Home Screen App)
    ======================================== */
 
@@ -85,70 +105,103 @@
     padding-top: var(--spacing-md);
 }
 
-/* iOS-specific fixes */
+/* iOS-specific fixes - Modern viewport units */
 html {
     height: 100%;
-    height: -webkit-fill-available;
+    height: 100dvh; /* Dynamic viewport height */
     overflow: hidden;
+}
+
+@supports not (height: 100dvh) {
+    html {
+        height: -webkit-fill-available;
+    }
 }
 
 body {
-    min-height: 100vh;
-    min-height: -webkit-fill-available;
     height: 100%;
+    height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
+    margin: 0;
 }
 
-/* Mobile App Container */
+@supports not (height: 100dvh) {
+    body {
+        min-height: -webkit-fill-available;
+    }
+}
+
+/* Mobile App Container - CSS Grid Layout */
 .mobile-app {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+        "header"
+        "content"
+        "tabbar";
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
+    height: 100dvh;
+    height: 100vh; /* Fallback */
     background-color: var(--color-gray-50);
     overflow: hidden;
-    /* Reserve space for fixed tab bar so content doesn't extend behind it */
-    padding-bottom: calc(75px + env(safe-area-inset-bottom));
 }
 
-/* Voice tab needs less bottom padding */
+@supports (height: 100dvh) {
+    .mobile-app {
+        height: 100dvh;
+    }
+}
+
+/* Voice tab doesn't need special padding anymore with grid */
 .mobile-app:has(#voice-tab.active) {
-    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    /* Grid handles layout automatically */
 }
 
-/* Mobile Header */
+/* Mobile Header - Compact design */
 .app-header-mobile {
-    background-color: var(--color-white);
+    grid-area: header;
+    background-color: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--color-gray-200);
-    padding: var(--spacing-md);
-    padding-top: calc(env(safe-area-inset-top) + var(--spacing-md));
-    flex-shrink: 0;
-    position: sticky;
-    top: env(safe-area-inset-top);
+    padding: var(--spacing-sm) var(--content-padding);
+    padding-top: calc(var(--safe-area-top) + var(--spacing-sm));
+    padding-left: calc(var(--safe-area-left) + var(--content-padding));
+    padding-right: calc(var(--safe-area-right) + var(--content-padding));
     z-index: 100;
+    transition: padding 0.2s ease, background-color 0.2s ease;
+}
+
+/* Compact header state on scroll */
+.app-header-mobile.compact {
+    padding-top: calc(var(--safe-area-top) + 6px);
+    padding-bottom: 6px;
+}
+
+.app-header-mobile.compact .app-version {
+    display: none;
 }
 
 .header-content-mobile {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    min-height: 40px;
 }
 
 .header-actions {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
 }
 
 .logo-mobile {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 20px;
+    gap: var(--spacing-xs);
+    font-size: 18px;
     font-weight: 700;
     color: var(--color-black);
 }
@@ -159,11 +212,12 @@ body {
     color: var(--color-gray-400);
     margin-left: var(--spacing-xs);
     opacity: 0.7;
+    transition: opacity 0.2s ease;
 }
 
 .logo-icon-mobile {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
 }
 
 .status-indicator-mobile {
@@ -187,9 +241,9 @@ body {
     background-color: var(--color-error);
 }
 
-/* Main Content */
+/* Main Content - Grid area with improved scrolling */
 .app-content {
-    flex: 1;
+    grid-area: content;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -197,16 +251,30 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    /* Hide scrollbar for cleaner look */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
 }
 
-/* Tab Content */
+.app-content::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+/* Tab Content - Reduced padding for more content */
 .tab-content {
+    grid-area: content;
     display: none;
-    padding: var(--spacing-md);
-    padding-bottom: var(--spacing-lg);
+    padding: var(--content-padding);
+    padding-left: calc(var(--safe-area-left) + var(--content-padding));
+    padding-right: calc(var(--safe-area-right) + var(--content-padding));
+    padding-bottom: var(--spacing-md);
     height: auto;
     flex: 1;
     min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .tab-content.active {
@@ -219,17 +287,17 @@ body {
     padding: 0;
 }
 
-/* Bottom Tab Bar */
+/* Bottom Tab Bar - Backdrop blur and grid area */
 .tab-bar {
+    grid-area: tabbar;
     display: flex;
-    background-color: var(--color-white);
+    background-color: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
     border-top: 1px solid var(--color-gray-200);
-    padding-bottom: env(safe-area-inset-bottom);
-    flex-shrink: 0;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    padding-bottom: var(--safe-area-bottom);
+    padding-left: var(--safe-area-left);
+    padding-right: var(--safe-area-right);
     z-index: 100;
 }
 
@@ -239,41 +307,56 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-sm) var(--spacing-md);
+    min-height: 49px; /* iOS standard */
+    padding: var(--spacing-xs) var(--spacing-sm);
     background: none;
     border: none;
     color: var(--color-gray-500);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     cursor: pointer;
     transition: color var(--transition-fast);
     -webkit-tap-highlight-color: transparent;
+    position: relative;
 }
 
 .tab-button.active {
     color: var(--color-black);
 }
 
-.tab-icon {
-    width: 24px;
-    height: 24px;
-    margin-bottom: 4px;
+/* Active indicator dot */
+.tab-button.active::after {
+    content: '';
+    position: absolute;
+    bottom: calc(var(--safe-area-bottom) + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--color-black);
 }
 
-/* Macros List */
+.tab-icon {
+    width: 22px;
+    height: 22px;
+    margin-bottom: 2px;
+}
+
+/* Macros List - More compact */
 .macros-list {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
+    gap: 6px;
     flex: 1;
     overflow: visible;
 }
 
-/* Tile View for Macros */
+/* Tile View for Macros - Tighter grid */
 .macros-list.tile-view {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-sm);
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px;
     align-content: start;
 }
 
@@ -282,12 +365,12 @@ body {
     justify-content: center;
     align-items: center;
     text-align: center;
-    padding: var(--spacing-md);
-    min-height: 100px;
+    padding: var(--spacing-sm);
+    min-height: 80px;
 }
 
 .macros-list.tile-view .macro-info {
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
 }
 
 .macros-list.tile-view .macro-name {
@@ -329,8 +412,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     background: none;
     border: none;
     border-radius: var(--radius-sm);
@@ -347,17 +432,18 @@ body {
 }
 
 .view-toggle-btn svg {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
 }
 
+/* Macro items - More compact */
 .macro-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
     background-color: var(--color-white);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--color-gray-200);
     cursor: pointer;
@@ -375,11 +461,11 @@ body {
 }
 
 .macro-name {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--color-gray-900);
     flex: 1;
-    margin-right: var(--spacing-md);
+    margin-right: var(--spacing-sm);
 }
 
 .macro-description {
@@ -392,8 +478,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     background-color: var(--color-black);
     color: var(--color-white);
     border: none;
@@ -411,27 +499,27 @@ body {
 }
 
 .macro-run-btn svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
 }
 
 .macro-run-btn .spinner-icon {
     animation: spin 1s linear infinite;
 }
 
-/* Speakers List */
+/* Speakers List - Compact */
 .speakers-list {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
     flex: 1;
     overflow: visible;
 }
 
 .speaker-card {
     background-color: var(--color-white);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--color-gray-200);
 }
@@ -440,18 +528,18 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
 }
 
 .speaker-name {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--color-gray-900);
 }
 
 .speaker-status {
-    font-size: 13px;
-    padding: 4px 8px;
+    font-size: 11px;
+    padding: 2px 6px;
     border-radius: var(--radius-sm);
     font-weight: 600;
     text-transform: uppercase;
@@ -477,15 +565,15 @@ body {
 }
 
 .speaker-track-info {
-    margin-bottom: var(--spacing-md);
-    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
     background-color: var(--color-gray-50);
-    border-radius: var(--radius-md);
-    min-height: 52px;
+    border-radius: var(--radius-sm);
+    min-height: 40px;
 }
 
 .track-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--color-gray-900);
     white-space: nowrap;
@@ -494,7 +582,7 @@ body {
 }
 
 .track-artist {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--color-gray-500);
     white-space: nowrap;
     overflow: hidden;
@@ -505,16 +593,18 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
 }
 
 .control-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
+    min-width: 44px; /* Touch target */
+    min-height: 44px;
     background-color: var(--color-gray-100);
     color: var(--color-gray-700);
     border: none;
@@ -530,8 +620,8 @@ body {
 }
 
 .control-btn.play-pause {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     background-color: var(--color-black);
     color: var(--color-white);
 }
