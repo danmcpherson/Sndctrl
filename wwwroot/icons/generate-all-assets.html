@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate App Icons & Splash Screens</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f5f5f5; }
+        h1, h2 { margin-bottom: 15px; }
+        .section { margin-bottom: 40px; }
+        .grid { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+        .item { background: white; padding: 15px; border-radius: 8px; text-align: center; }
+        canvas { display: block; margin: 0 auto 10px; }
+        .icon-canvas { border-radius: 20%; }
+        button { padding: 8px 16px; cursor: pointer; margin: 5px; }
+        .instructions { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .download-all { background: #4CAF50; color: white; font-size: 16px; padding: 12px 24px; border: none; border-radius: 8px; }
+        .splash-preview { max-width: 150px; max-height: 300px; border: 1px solid #ddd; }
+        .status { background: #fff3cd; padding: 10px; border-radius: 8px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🎵 sndctl - Generate App Assets</h1>
+    
+    <div class="instructions">
+        <p><strong>Instructions:</strong></p>
+        <ol>
+            <li>Click "Download All Icons" to get all PNG icons</li>
+            <li>Click "Download All Splash Screens" to get iOS launch screens</li>
+            <li>Place all files in the <code>wwwroot/icons/</code> folder</li>
+        </ol>
+        <p><em>Note: Splash screens use the same design as the app icon centered on the background.</em></p>
+    </div>
+
+    <div class="section">
+        <h2>📱 App Icons</h2>
+        <button class="download-all" onclick="downloadAllIcons()">Download All Icons</button>
+        <div class="grid" id="icons"></div>
+    </div>
+
+    <div class="section">
+        <h2>🚀 iOS Splash Screens</h2>
+        <button class="download-all" onclick="downloadAllSplash()">Download All Splash Screens</button>
+        <div id="status" class="status" style="display:none;"></div>
+        <div class="grid" id="splashes"></div>
+    </div>
+
+    <script>
+        // Icon sizes
+        const iconSizes = [
+            { name: 'app-icon-180.png', size: 180 },
+            { name: 'app-icon-167.png', size: 167 },
+            { name: 'app-icon-152.png', size: 152 },
+            { name: 'app-icon-120.png', size: 120 },
+            { name: 'app-icon-32.png', size: 32 }
+        ];
+
+        // Splash screen sizes for various iOS devices
+        const splashSizes = [
+            { name: 'splash-1290x2796.png', width: 1290, height: 2796, desc: 'iPhone 14 Pro Max / 15 Plus' },
+            { name: 'splash-1179x2556.png', width: 1179, height: 2556, desc: 'iPhone 14 Pro / 15 Pro' },
+            { name: 'splash-1170x2532.png', width: 1170, height: 2532, desc: 'iPhone 14 / 15' },
+            { name: 'splash-1242x2688.png', width: 1242, height: 2688, desc: 'iPhone XS Max / 11 Pro Max' },
+            { name: 'splash-1125x2436.png', width: 1125, height: 2436, desc: 'iPhone X / 12 Mini' },
+            { name: 'splash-750x1334.png', width: 750, height: 1334, desc: 'iPhone SE / 8' },
+            { name: 'splash-2048x2732.png', width: 2048, height: 2732, desc: 'iPad Pro 12.9"' },
+            { name: 'splash-1668x2388.png', width: 1668, height: 2388, desc: 'iPad Pro 11"' },
+            { name: 'splash-1640x2360.png', width: 1640, height: 2360, desc: 'iPad Air' },
+            { name: 'splash-1536x2048.png', width: 1536, height: 2048, desc: 'iPad Mini' }
+        ];
+
+        function drawIcon(ctx, size) {
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#16213e');
+            
+            // Fill background
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // Music note icon
+            const scale = size / 24;
+            const offsetX = size * 0.2;
+            const offsetY = size * 0.15;
+            
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            ctx.scale(scale * 0.6, scale * 0.6);
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.fillStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // Staff line
+            ctx.beginPath();
+            ctx.moveTo(9, 18);
+            ctx.lineTo(9, 5);
+            ctx.lineTo(21, 3);
+            ctx.lineTo(21, 16);
+            ctx.stroke();
+            
+            // Left circle
+            ctx.beginPath();
+            ctx.arc(6, 18, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Right circle
+            ctx.beginPath();
+            ctx.arc(18, 16, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function drawSplash(ctx, width, height) {
+            // Background gradient (same as app)
+            const gradient = ctx.createLinearGradient(0, 0, width, height);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#16213e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+            
+            // Draw centered icon (about 1/4 of the smaller dimension)
+            const iconSize = Math.min(width, height) * 0.25;
+            const iconX = (width - iconSize) / 2;
+            const iconY = (height - iconSize) / 2 - height * 0.05; // Slightly above center
+            
+            ctx.save();
+            ctx.translate(iconX, iconY);
+            
+            // Draw the music note at scale
+            const scale = iconSize / 24;
+            ctx.scale(scale, scale);
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.fillStyle = '#ffffff';
+            ctx.lineWidth = 2 / scale * 0.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // Staff line
+            ctx.beginPath();
+            ctx.moveTo(9, 18);
+            ctx.lineTo(9, 5);
+            ctx.lineTo(21, 3);
+            ctx.lineTo(21, 16);
+            ctx.stroke();
+            
+            // Left circle
+            ctx.beginPath();
+            ctx.arc(6, 18, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Right circle
+            ctx.beginPath();
+            ctx.arc(18, 16, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // App name below icon
+            const fontSize = Math.min(width, height) * 0.05;
+            ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.fillText('sndctl', width / 2, iconY + iconSize + fontSize * 1.5);
+        }
+
+        // Create icon elements
+        const iconContainer = document.getElementById('icons');
+        const iconCanvases = [];
+        
+        iconSizes.forEach(({ name, size }) => {
+            const div = document.createElement('div');
+            div.className = 'item';
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            canvas.className = 'icon-canvas';
+            const ctx = canvas.getContext('2d');
+            drawIcon(ctx, size);
+            
+            iconCanvases.push({ name, canvas });
+            
+            const label = document.createElement('div');
+            label.textContent = `${size}×${size}`;
+            
+            const btn = document.createElement('button');
+            btn.textContent = 'Download';
+            btn.onclick = () => downloadCanvas(canvas, name);
+            
+            div.appendChild(canvas);
+            div.appendChild(label);
+            div.appendChild(btn);
+            iconContainer.appendChild(div);
+        });
+
+        // Create splash screen previews (scaled down)
+        const splashContainer = document.getElementById('splashes');
+        const splashCanvases = [];
+        
+        splashSizes.forEach(({ name, width, height, desc }) => {
+            const div = document.createElement('div');
+            div.className = 'item';
+            
+            // Create full-size canvas (but don't display it)
+            const fullCanvas = document.createElement('canvas');
+            fullCanvas.width = width;
+            fullCanvas.height = height;
+            const ctx = fullCanvas.getContext('2d');
+            drawSplash(ctx, width, height);
+            
+            splashCanvases.push({ name, canvas: fullCanvas });
+            
+            // Create preview (scaled down)
+            const previewCanvas = document.createElement('canvas');
+            const previewScale = 150 / width;
+            previewCanvas.width = 150;
+            previewCanvas.height = height * previewScale;
+            previewCanvas.className = 'splash-preview';
+            const previewCtx = previewCanvas.getContext('2d');
+            previewCtx.scale(previewScale, previewScale);
+            drawSplash(previewCtx, width, height);
+            
+            const label = document.createElement('div');
+            label.innerHTML = `<strong>${width}×${height}</strong><br><small>${desc}</small>`;
+            
+            const btn = document.createElement('button');
+            btn.textContent = 'Download';
+            btn.onclick = () => downloadCanvas(fullCanvas, name);
+            
+            div.appendChild(previewCanvas);
+            div.appendChild(label);
+            div.appendChild(btn);
+            splashContainer.appendChild(div);
+        });
+
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        async function downloadAllIcons() {
+            for (const { name, canvas } of iconCanvases) {
+                downloadCanvas(canvas, name);
+                await new Promise(r => setTimeout(r, 200)); // Small delay between downloads
+            }
+        }
+
+        async function downloadAllSplash() {
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            
+            for (let i = 0; i < splashCanvases.length; i++) {
+                const { name, canvas } = splashCanvases[i];
+                status.textContent = `Downloading ${i + 1} of ${splashCanvases.length}: ${name}...`;
+                downloadCanvas(canvas, name);
+                await new Promise(r => setTimeout(r, 300)); // Delay between downloads
+            }
+            
+            status.textContent = '✅ All splash screens downloaded!';
+            setTimeout(() => { status.style.display = 'none'; }, 3000);
+        }
+    </script>
+</body>
+</html>

@@ -1,5 +1,37 @@
 /* Mobile App Styles */
 
+/* ========================================
+   Standalone Mode (Home Screen App)
+   ======================================== */
+
+/* Detect standalone mode */
+@media all and (display-mode: standalone) {
+    /* Prevent overscroll bounce in standalone mode */
+    html, body {
+        overscroll-behavior: none;
+    }
+    
+    /* Hide any install prompts when already installed */
+    .install-prompt {
+        display: none !important;
+    }
+}
+
+/* iOS standalone mode specific styles */
+@supports (-webkit-touch-callout: none) {
+    /* Prevent text selection on long press for app-like feel */
+    .mobile-app {
+        -webkit-user-select: none;
+        user-select: none;
+    }
+    
+    /* But allow selection in text inputs */
+    input, textarea {
+        -webkit-user-select: text;
+        user-select: text;
+    }
+}
+
 /* Battery Warning Banner */
 .battery-warning {
     display: flex;
