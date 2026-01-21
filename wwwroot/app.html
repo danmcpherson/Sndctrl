@@ -268,17 +268,17 @@
                                 <option value="shimmer">Shimmer</option>
                             </select>
                             
-                            <label for="vad-sensitivity">
-                                Microphone Sensitivity
-                                <span class="settings-help-text">Lower = less sensitive (filters background music)</span>
+                            <label for="turn-detection-threshold">
+                                Speech Detection Threshold
+                                <span class="settings-help-text">Higher = less sensitive (filters background music better)</span>
                             </label>
                             <div class="slider-container">
-                                <input type="range" id="vad-sensitivity" class="sensitivity-slider" 
-                                       min="5" max="50" value="15" step="1"
-                                       oninput="voiceAssistant.updateVadSensitivity(this.value); document.getElementById('vad-value').textContent = this.value">
+                                <input type="range" id="turn-detection-threshold" class="sensitivity-slider" 
+                                       min="20" max="90" value="50" step="5"
+                                       oninput="voiceAssistant.updateTurnDetectionThreshold(this.value); document.getElementById('threshold-value').textContent = this.value">
                                 <div class="slider-labels">
                                     <span>Less</span>
-                                    <span id="vad-value" class="slider-value">15</span>
+                                    <span id="threshold-value" class="slider-value">50</span>
                                     <span>More</span>
                                 </div>
                             </div>
