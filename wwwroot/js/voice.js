@@ -1419,7 +1419,7 @@ window.voiceAssistant = {
         
         switch (state) {
             case 'idle':
-                if (stateText) stateText.textContent = 'Tap to speak';
+                if (stateText) stateText.textContent = '';
                 micIcon?.classList.remove('hidden');
                 stopIcon?.classList.add('hidden');
                 break;
