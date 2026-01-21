@@ -749,6 +749,17 @@ window.voiceAssistant = {
                     break;
                     
                 case 'error':
+                    // Handle API errors (like truncation position exceeding audio length)
+                    if (message.error) {
+                        console.warn('OpenAI API error:', message.error.type, message.error.message);
+                        // Don't show user-facing error for truncation edge cases
+                        if (!message.error.type?.includes('truncate')) {
+                            this.showError(`API error: ${message.error.message}`);
+                        }
+                    }
+                    break;
+                    
+                case 'error':
                     console.error('API Error:', message.error);
                     this.showError(message.error?.message || 'An error occurred');
                     break;
@@ -869,15 +880,17 @@ window.voiceAssistant = {
      */
     handleUserInterruption() {
         // Calculate how much audio was actually played
-        let playedMs = this.totalAudioDuration;
+        let playedMs = this.totalAudioDuration; // Start with completed chunks
         
         // If currently playing, add the partial chunk time
         if (this.audioPlaybackStartTime && this.audioContext) {
             const elapsedTime = (this.audioContext.currentTime - this.audioPlaybackStartTime) * 1000;
-            playedMs = Math.floor(elapsedTime);
+            playedMs += Math.floor(elapsedTime); // Add current chunk progress
         }
         
-        if (this.lastAssistantItemId && playedMs > 0) {
+        // Only send truncation if we have a meaningful amount of audio played (> 100ms)
+        // This avoids errors when interruption happens at the very end or due to timing issues
+        if (this.lastAssistantItemId && playedMs > 100) {
             console.log(`Truncating assistant audio at ${playedMs}ms for item ${this.lastAssistantItemId}`);
             
             // Send truncate event to remove unplayed audio from conversation
@@ -889,6 +902,8 @@ window.voiceAssistant = {
                     audio_end_ms: playedMs
                 }));
             }
+        } else if (playedMs <= 100) {
+            console.log('Skipping truncation - interruption too close to end or timing issue');
         }
         
         // Reset tracking
