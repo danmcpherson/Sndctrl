@@ -1741,3 +1741,281 @@ details[open] .individual-volumes-summary .expand-icon {
     text-align: center;
 }
 
+/* Voice Text Input */
+.voice-text-input-container {
+    display: flex;
+    gap: var(--spacing-sm);
+    width: 100%;
+    max-width: 400px;
+    margin-top: var(--spacing-md);
+}
+
+.voice-text-input {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    background-color: var(--color-white);
+    color: var(--color-gray-900);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.voice-text-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+}
+
+.voice-text-input::placeholder {
+    color: var(--color-gray-400);
+}
+
+.voice-text-send {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: var(--radius-lg);
+    background-color: var(--color-primary);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.voice-text-send:hover {
+    background-color: var(--color-primary-dark);
+}
+
+.voice-text-send:active {
+    transform: scale(0.95);
+}
+
+.voice-text-send svg {
+    width: 20px;
+    height: 20px;
+    stroke: white;
+}
+
+/* ========================================
+   Library Mobile Styles
+   ======================================== */
+.library-container {
+    padding: var(--content-padding);
+    padding-bottom: calc(var(--tab-bar-height) + var(--safe-area-bottom) + var(--content-padding));
+}
+
+.library-search-bar {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.library-search-bar .search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--color-gray-400);
+    pointer-events: none;
+}
+
+.library-search-input {
+    width: 100%;
+    padding: 0.75rem 0.75rem 0.75rem 2.75rem;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    background: var(--color-white);
+}
+
+.library-search-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.library-categories {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.25rem;
+}
+
+.library-categories::-webkit-scrollbar {
+    display: none;
+}
+
+.library-category-btn {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    background: var(--color-gray-100);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-gray-700);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.library-category-btn.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.library-speaker-select-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: var(--color-gray-50);
+    border-radius: var(--radius-md);
+}
+
+.library-speaker-label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-gray-700);
+    white-space: nowrap;
+}
+
+.library-speaker-label svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.library-speaker-select {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    background: var(--color-white);
+}
+
+.library-refresh-btn {
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    background: var(--color-white);
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.library-refresh-btn:hover {
+    background: var(--color-gray-100);
+    color: var(--color-gray-800);
+}
+
+.library-refresh-btn:active {
+    transform: scale(0.95);
+}
+
+.library-refresh-btn svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.library-items {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.library-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.library-item:active {
+    transform: scale(0.98);
+    background: var(--color-gray-50);
+}
+
+.library-item-icon {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    background: var(--color-gray-100);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-gray-500);
+}
+
+.library-item-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.library-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.library-item-title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--color-gray-900);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.library-item-subtitle {
+    font-size: 0.8125rem;
+    color: var(--color-gray-500);
+    margin-top: 0.125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.library-item-play {
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.library-item-play:active {
+    transform: scale(0.9);
+}
+
+.library-item-play svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    margin-left: 2px;
+}

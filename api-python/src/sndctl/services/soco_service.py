@@ -19,11 +19,26 @@ from typing import Any
 import soco
 from soco import SoCo
 from soco.exceptions import SoCoException
+from soco.plugins.sharelink import ShareLinkPlugin
 
 from ..config import Settings
 from ..models import Speaker, Favorite, QueueItem, ListItem
+from ..models.library import (
+    Artist,
+    Album,
+    Track,
+    Genre,
+    ArtistBrowseResult,
+    AlbumBrowseResult,
+    TrackBrowseResult,
+    GenreBrowseResult,
+)
 
 logger = logging.getLogger(__name__)
+
+
+# Type alias for library cache data
+LibraryCacheData = dict[str, list[dict]]
 
 
 class SoCoService:
@@ -39,6 +54,17 @@ class SoCoService:
         self._speakers_cache: dict[str, SoCo] = {}
         self._last_discovery: datetime | None = None
         self._discovery_lock = asyncio.Lock()
+        
+        # Library cache for faster browsing
+        self._library_cache: LibraryCacheData = {
+            'artists': [],
+            'albums': [],
+            'tracks': [],
+            'genres': []
+        }
+        self._library_cache_time: datetime | None = None
+        self._library_cache_lock = asyncio.Lock()
+        self._library_cache_task: asyncio.Task | None = None
     
     def _scan_ip_for_sonos(self, ip: str) -> tuple[str, str] | None:
         """Check if a Sonos speaker exists at the given IP.
@@ -579,40 +605,177 @@ class SoCoService:
     def _play_favorite_sync(self, device: SoCo, favorite_name: str) -> bool:
         """Synchronous helper to play a favorite.
         
-        Handles track/album favorites by adding to queue and playing.
-        Container-type favorites (artists, playlists from streaming services)
-        are not currently supported by SoCo and will return False.
+        Uses the same two-step approach as soco-cli:
+        1. Try play_uri() with resource_meta_data
+        2. Fall back to add_to_queue() + play_from_queue()
         """
         try:
             # Use coordinator for playback operations
             playback_device = self._get_playback_device(device)
             music_library = playback_device.music_library
-            favorites = music_library.get_sonos_favorites()
+            # Note: soco-cli uses complete_result=True, let's do the same
+            favorites = music_library.get_sonos_favorites(complete_result=True)
             
+            # Find the favorite (strict match first, then fuzzy)
+            the_fav = None
             for fav in favorites:
-                if fav.title.lower() == favorite_name.lower():
-                    # Check if favorite has resources (track/album type)
-                    if fav.resources:
-                        # Track/album - add to queue and play
-                        playback_device.clear_queue()
-                        playback_device.add_to_queue(fav)
-                        playback_device.play_from_queue(0)
-                        return True
-                    else:
-                        # Container type (artist/playlist from streaming service)
-                        # SoCo does not support playing these directly
-                        logger.warning(
-                            "Favorite '%s' is a container type (artist/playlist) which "
-                            "cannot be played directly. Only track/album favorites are supported.",
-                            favorite_name
-                        )
-                        return False
+                if fav.title == favorite_name:
+                    logger.info("Strict match found: %s", fav.title)
+                    the_fav = fav
+                    break
             
-            logger.warning("Favorite not found: %s", favorite_name)
-            return False
+            if not the_fav:
+                # Fuzzy match
+                favorite_lower = favorite_name.lower()
+                for fav in favorites:
+                    if favorite_lower in fav.title.lower():
+                        logger.info("Fuzzy match found: %s", fav.title)
+                        the_fav = fav
+                        break
+            
+            if not the_fav:
+                logger.warning("Favorite not found: %s", favorite_name)
+                return False
+            
+            # Log favorite attributes for debugging
+            logger.info("Favorite has resources: %s", bool(the_fav.resources) if hasattr(the_fav, 'resources') else False)
+            logger.info("Favorite item_class: %s", the_fav.item_class if hasattr(the_fav, 'item_class') else 'N/A')
+            if hasattr(the_fav, 'reference_id'):
+                logger.info("Favorite reference_id: %s", the_fav.reference_id)
+            if hasattr(the_fav, 'item_id'):
+                logger.info("Favorite item_id: %s", the_fav.item_id)
+            
+            # Try the soco-cli two-step approach
+            # Step 1: Try play_uri() with resource_meta_data
+            try:
+                # For favorites without resources, get_uri() will fail
+                # So we need to check first
+                if the_fav.resources:
+                    uri = the_fav.get_uri()
+                    metadata = the_fav.resource_meta_data
+                    logger.info("Trying play_uri() with resources: URI=%s", uri)
+                    playback_device.play_uri(uri=uri, meta=metadata)
+                    logger.info("Successfully played favorite via play_uri: %s", favorite_name)
+                    return True
+                else:
+                    raise Exception("No resources available, skipping play_uri()")
+            except Exception as e1:
+                logger.info("play_uri() not applicable: %s, trying add_to_queue()", e1)
+                
+                # Step 2: Fall back to add_to_queue() + play_from_queue()
+                try:
+                    # Check if favorite has a reference (the actual playable item)
+                    if hasattr(the_fav, 'reference') and the_fav.reference:
+                        logger.info("Favorite has reference, trying to play reference object")
+                        ref = the_fav.reference
+                        logger.info("Reference type: %s, has resources: %s", 
+                                  type(ref).__name__, bool(ref.resources) if hasattr(ref, 'resources') else False)
+                        
+                        # Try to add the reference to queue
+                        if ref.resources:
+                            index = playback_device.add_to_queue(ref, as_next=True)
+                            playback_device.play_from_queue(index, start=True)
+                            logger.info("Successfully played favorite via reference: %s", favorite_name)
+                            return True
+                    
+                    # If no reference or reference has no resources, check direct resources
+                    if the_fav.resources:
+                        # Try regular add_to_queue for favorites with resources
+                        index = playback_device.add_to_queue(the_fav, as_next=True)
+                        playback_device.play_from_queue(index, start=True)
+                        logger.info("Successfully played favorite via queue: %s", favorite_name)
+                        return True
+                    
+                    # Step 3: Try container-based playback for Apple Music/music service containers
+                    # Many favorites are "shortcuts" that link to browseable containers
+                    if hasattr(the_fav, 'reference') and the_fav.reference:
+                        ref = the_fav.reference
+                        # If the reference is a container (artist, playlist, album), try browsing it
+                        if hasattr(ref, 'item_class') and 'container' in ref.item_class.lower():
+                            logger.info("Reference is a container (%s), attempting to play first item", ref.item_class)
+                            try:
+                                # Browse the container to get playable items
+                                items = playback_device.music_library.browse(ref, max_items=1)
+                                if items:
+                                    first_item = items[0]
+                                    logger.info("Playing first item from container: %s", first_item.title if hasattr(first_item, 'title') else 'Unknown')
+                                    playback_device.clear_queue()
+                                    playback_device.add_to_queue(first_item)
+                                    playback_device.play_from_queue(0, start=True)
+                                    logger.info("Successfully played container favorite: %s", favorite_name)
+                                    return True
+                                else:
+                                    logger.warning("Container is empty: %s", favorite_name)
+                            except Exception as e_browse:
+                                logger.warning("Failed to browse container: %s", e_browse)
+                    
+                    # Step 4: For Spotify/Tidal, try ShareLinkPlugin
+                    # This handles Spotify/Tidal/Apple Music URIs like spotify:artist:xxx
+                    logger.info("Attempting ShareLinkPlugin for container-type favorite")
+                    try:
+                        plugin = ShareLinkPlugin(playback_device)
+                        
+                        # Extract the URI - look for streaming service URIs
+                        # Check both favorite's item_id and reference's item_id
+                        uri_to_try = None
+                        source = None
+                        
+                        # Try reference object first (often has the actual service URI)
+                        check_ids = []
+                        if hasattr(the_fav, 'reference') and the_fav.reference and hasattr(the_fav.reference, 'item_id'):
+                            check_ids.append(('reference', the_fav.reference.item_id))
+                        if hasattr(the_fav, 'item_id') and the_fav.item_id:
+                            check_ids.append(('favorite', the_fav.item_id))
+                        
+                        for src, item_id in check_ids:
+                            if not uri_to_try and item_id:
+                                # Check for Spotify URIs
+                                if 'spotify:' in item_id:
+                                    start_idx = item_id.find('spotify:')
+                                    uri_to_try = item_id[start_idx:].split('?')[0].split('&')[0]
+                                    source = src
+                                    logger.info("Extracted Spotify URI from %s: %s", src, uri_to_try)
+                                # Check for Tidal URIs
+                                elif 'tidal:' in item_id:
+                                    start_idx = item_id.find('tidal:')
+                                    uri_to_try = item_id[start_idx:].split('?')[0].split('&')[0]
+                                    source = src
+                                    logger.info("Extracted Tidal URI from %s: %s", src, uri_to_try)
+                                # Check for Apple Music URIs (format: "10052064artist%3a439036555")
+                                elif item_id.startswith('1005206'):
+                                    # Apple Music uses encoded URIs like "10052064artist%3a439036555"
+                                    # These cannot be used directly with ShareLinkPlugin
+                                    # Instead, we need to use the container URI approach
+                                    logger.info("Found Apple Music container ID in %s: %s", src, item_id)
+                                    # This requires browsing the container, not ShareLinkPlugin
+                                    uri_to_try = None  # Skip ShareLinkPlugin for Apple Music
+                        
+                        if uri_to_try:
+                            logger.info("Using ShareLinkPlugin to add %s URI: %s", source, uri_to_try)
+                            index = plugin.add_share_link_to_queue(uri_to_try, as_next=True)
+                            playback_device.play_from_queue(index, start=True)
+                            logger.info("Successfully played favorite via ShareLinkPlugin: %s", favorite_name)
+                            return True
+                        else:
+                            logger.warning("Could not extract compatible service URI from favorite (checked: %s)", 
+                                         ', '.join([f"{s}={i}" for s, i in check_ids]))
+                    
+                    except Exception as e_share:
+                        logger.warning("ShareLinkPlugin failed for %s: %s", favorite_name, e_share)
+                    
+                    # If all else fails
+                    logger.warning("Container-type favorite '%s' (item_class: %s) cannot be played. "
+                                 "No resources, reference, or extractable service URI found. "
+                                 "Try adding individual tracks/albums as favorites instead.", 
+                                 favorite_name, the_fav.item_class)
+                    return False
+                    
+                except Exception as e2:
+                    logger.error("Failed to play favorite %s: %s", favorite_name, e2)
+                    return False
             
         except Exception as e:
-            logger.error("Error playing favorite: %s", e)
+            logger.error("Error playing favorite %s: %s", favorite_name, e)
             return False
     
     async def play_favorite_by_number(self, speaker_name: str, number: int) -> bool:
@@ -1469,8 +1632,417 @@ class SoCoService:
             return False
         
         try:
-            await asyncio.to_thread(device.play_uri, uri)
+            # play_uri must be called on the group coordinator
+            coordinator = device.group.coordinator
+            logger.debug("Playing URI on %s (coordinator: %s)", speaker_name, coordinator.player_name)
+            await asyncio.to_thread(coordinator.play_uri, uri)
             return True
         except Exception as e:
             logger.error("Failed to play URI on %s: %s", speaker_name, e)
             return False
+    
+    # =========================================================================
+    # LOCAL MUSIC LIBRARY
+    # =========================================================================
+    
+    async def get_library_artists(
+        self,
+        search: str | None = None,
+        max_items: int = 100
+    ) -> ArtistBrowseResult:
+        """Get artists from local music library.
+        
+        Args:
+            search: Optional search term to filter artists.
+            max_items: Maximum number of items to return.
+            
+        Returns:
+            Browse result with artists.
+        """
+        # Ensure speakers are discovered
+        if not self._speakers_cache:
+            await self.discover_speakers()
+        
+        def _browse():
+            # Get any speaker for library access
+            if not self._speakers_cache:
+                raise ValueError("No speakers available")
+            device = next(iter(self._speakers_cache.values()), None)
+            if not device:
+                raise ValueError("No speakers available")
+            library = device.music_library
+            
+            # Get artists
+            result = library.get_album_artists(
+                search_term=search if search else '',
+                max_items=max_items
+            )
+            
+            # Convert iterator to list to avoid StopIteration in async context
+            items_list = list(result)
+            
+            # Convert to Artist models
+            artists = []
+            for item in items_list:
+                try:
+                    uri = item.get_uri() if hasattr(item, 'get_uri') else None
+                except:
+                    uri = None
+                
+                artists.append(Artist(
+                    id=item.item_id if hasattr(item, 'item_id') else '',
+                    title=item.title,
+                    uri=uri
+                ))
+            
+            return ArtistBrowseResult(
+                items=artists,
+                total_matches=result.total_matches,
+                number_returned=result.number_returned
+            )
+        
+        return await asyncio.to_thread(_browse)
+    
+    async def get_library_albums(
+        self,
+        artist_id: str | None = None,
+        search: str | None = None,
+        max_items: int = 100
+    ) -> AlbumBrowseResult:
+        """Get albums from local music library.
+        
+        Args:
+            artist_id: Optional artist ID to filter by.
+            search: Optional search term to filter albums.
+            max_items: Maximum number of items to return.
+            
+        Returns:
+            Browse result with albums.
+        """
+        # Ensure speakers are discovered
+        if not self._speakers_cache:
+            await self.discover_speakers()
+        
+        def _browse():
+            if not self._speakers_cache:
+                raise ValueError("No speakers available")
+            device = next(iter(self._speakers_cache.values()), None)
+            if not device:
+                raise ValueError("No speakers available")
+            library = device.music_library
+            
+            # If artist_id provided, browse that artist
+            if artist_id:
+                # Need to get the artist item first
+                # For now, just browse all albums
+                result = library.get_albums(
+                    search_term=search if search else '',
+                    max_items=max_items
+                )
+            else:
+                result = library.get_albums(
+                    search_term=search if search else '',
+                    max_items=max_items
+                )
+            
+            # Convert iterator to list to avoid StopIteration in async context
+            items_list = list(result)
+            
+            # Convert to Album models
+            albums = []
+            for item in items_list:
+                try:
+                    uri = item.get_uri() if hasattr(item, 'get_uri') else None
+                except:
+                    uri = None
+                
+                albums.append(Album(
+                    id=item.item_id if hasattr(item, 'item_id') else '',
+                    title=item.title,
+                    uri=uri,
+                    artist=item.creator if hasattr(item, 'creator') else None,
+                    album_art_uri=item.album_art_uri if hasattr(item, 'album_art_uri') else None
+                ))
+            
+            return AlbumBrowseResult(
+                items=albums,
+                total_matches=result.total_matches,
+                number_returned=result.number_returned
+            )
+        
+        return await asyncio.to_thread(_browse)
+    
+    async def get_library_tracks(
+        self,
+        album_id: str | None = None,
+        search: str | None = None,
+        max_items: int = 100
+    ) -> TrackBrowseResult:
+        """Get tracks from local music library.
+        
+        Args:
+            album_id: Optional album ID to browse.
+            search: Optional search term to filter tracks.
+            max_items: Maximum number of items to return.
+            
+        Returns:
+            Browse result with tracks.
+        """
+        # Ensure speakers are discovered
+        if not self._speakers_cache:
+            await self.discover_speakers()
+        
+        def _browse():
+            if not self._speakers_cache:
+                raise ValueError("No speakers available")
+            device = next(iter(self._speakers_cache.values()), None)
+            if not device:
+                raise ValueError("No speakers available")
+            library = device.music_library
+            
+            result = library.get_tracks(
+                search_term=search if search else '',
+                max_items=max_items
+            )
+            
+            # Convert iterator to list to avoid StopIteration in async context
+            items_list = list(result)
+            
+            # Convert to Track models
+            tracks = []
+            for item in items_list:
+                try:
+                    uri = item.get_uri() if hasattr(item, 'get_uri') else None
+                except:
+                    uri = None
+                
+                tracks.append(Track(
+                    id=item.item_id if hasattr(item, 'item_id') else '',
+                    title=item.title,
+                    uri=uri,
+                    artist=item.creator if hasattr(item, 'creator') else None,
+                    album=item.album if hasattr(item, 'album') else None,
+                    album_art_uri=item.album_art_uri if hasattr(item, 'album_art_uri') else None
+                ))
+            
+            return TrackBrowseResult(
+                items=tracks,
+                total_matches=result.total_matches,
+                number_returned=result.number_returned
+            )
+        
+        return await asyncio.to_thread(_browse)
+    
+    async def get_library_genres(
+        self,
+        max_items: int = 100
+    ) -> GenreBrowseResult:
+        """Get genres from local music library.
+        
+        Args:
+            max_items: Maximum number of items to return.
+            
+        Returns:
+            Browse result with genres.
+        """
+        # Ensure speakers are discovered
+        if not self._speakers_cache:
+            await self.discover_speakers()
+        
+        def _browse():
+            if not self._speakers_cache:
+                raise ValueError("No speakers available")
+            device = next(iter(self._speakers_cache.values()), None)
+            if not device:
+                raise ValueError("No speakers available")
+            library = device.music_library
+            
+            result = library.get_genres(max_items=max_items)
+            
+            # Convert iterator to list to avoid StopIteration in async context
+            items_list = list(result)
+            
+            # Convert to Genre models
+            genres = []
+            for item in items_list:
+                try:
+                    uri = item.get_uri() if hasattr(item, 'get_uri') else None
+                except:
+                    uri = None
+                
+                genres.append(Genre(
+                    id=item.item_id if hasattr(item, 'item_id') else '',
+                    title=item.title,
+                    uri=uri
+                ))
+            
+            return GenreBrowseResult(
+                items=genres,
+                total_matches=result.total_matches,
+                number_returned=result.number_returned
+            )
+        
+        return await asyncio.to_thread(_browse)
+    
+    # =========================================================================
+    # LIBRARY CACHE MANAGEMENT
+    # =========================================================================
+    
+    async def start_library_cache_scheduler(self):
+        """Start the background task that refreshes library cache on schedule.
+        
+        Call this from the application lifespan startup.
+        """
+        if self._settings.library_cache_refresh_hours <= 0:
+            logger.info("Library cache scheduler disabled (refresh_hours = 0)")
+            return
+        
+        # Initial cache load
+        logger.info("Building initial library cache...")
+        await self.refresh_library_cache()
+        
+        # Start background scheduler
+        self._library_cache_task = asyncio.create_task(
+            self._library_cache_scheduler_loop()
+        )
+        logger.info(
+            "Library cache scheduler started (refreshes at %02d:00 daily)",
+            self._settings.library_cache_refresh_hour
+        )
+    
+    async def stop_library_cache_scheduler(self):
+        """Stop the library cache scheduler."""
+        if self._library_cache_task:
+            self._library_cache_task.cancel()
+            try:
+                await self._library_cache_task
+            except asyncio.CancelledError:
+                pass
+            self._library_cache_task = None
+            logger.info("Library cache scheduler stopped")
+    
+    async def _library_cache_scheduler_loop(self):
+        """Background loop that refreshes library cache at scheduled time."""
+        while True:
+            try:
+                # Calculate time until next scheduled refresh
+                now = datetime.now()
+                target_hour = self._settings.library_cache_refresh_hour
+                
+                # Calculate next run time
+                next_run = now.replace(
+                    hour=target_hour,
+                    minute=0,
+                    second=0,
+                    microsecond=0
+                )
+                if next_run <= now:
+                    # Already past today's time, schedule for tomorrow
+                    from datetime import timedelta
+                    next_run += timedelta(days=1)
+                
+                wait_seconds = (next_run - now).total_seconds()
+                logger.debug(
+                    "Library cache: next refresh at %s (in %.1f hours)",
+                    next_run.strftime("%Y-%m-%d %H:%M"),
+                    wait_seconds / 3600
+                )
+                
+                # Wait until scheduled time
+                await asyncio.sleep(wait_seconds)
+                
+                # Refresh the cache
+                logger.info("Scheduled library cache refresh starting...")
+                await self.refresh_library_cache()
+                
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error("Error in library cache scheduler: %s", e)
+                # Wait a bit before retrying
+                await asyncio.sleep(3600)  # 1 hour
+    
+    async def refresh_library_cache(self) -> dict:
+        """Refresh the library cache by fetching all items from Sonos.
+        
+        Returns:
+            Dict with counts of cached items.
+        """
+        async with self._library_cache_lock:
+            logger.info("Refreshing library cache...")
+            start_time = datetime.now()
+            
+            try:
+                # Fetch all categories (using larger limits for caching)
+                artists_result = await self.get_library_artists(max_items=1000)
+                albums_result = await self.get_library_albums(max_items=2000)
+                # Tracks can be very large, limit for memory
+                tracks_result = await self.get_library_tracks(max_items=500)
+                genres_result = await self.get_library_genres(max_items=500)
+                
+                # Store in cache as dicts for JSON serialization
+                self._library_cache = {
+                    'artists': [a.model_dump() for a in artists_result.items],
+                    'albums': [a.model_dump() for a in albums_result.items],
+                    'tracks': [t.model_dump() for t in tracks_result.items],
+                    'genres': [g.model_dump() for g in genres_result.items]
+                }
+                self._library_cache_time = datetime.now(timezone.utc)
+                
+                elapsed = (datetime.now() - start_time).total_seconds()
+                result = {
+                    'artists': len(self._library_cache['artists']),
+                    'albums': len(self._library_cache['albums']),
+                    'tracks': len(self._library_cache['tracks']),
+                    'genres': len(self._library_cache['genres']),
+                    'elapsed_seconds': elapsed
+                }
+                logger.info(
+                    "Library cache refreshed: %d artists, %d albums, %d tracks, %d genres (%.1fs)",
+                    result['artists'], result['albums'], result['tracks'], result['genres'], elapsed
+                )
+                return result
+                
+            except Exception as e:
+                logger.error("Failed to refresh library cache: %s", e)
+                raise
+    
+    def get_library_cache(self) -> dict:
+        """Get the current library cache.
+        
+        Returns:
+            Dict with cached items and metadata.
+        """
+        return {
+            'artists': self._library_cache.get('artists', []),
+            'albums': self._library_cache.get('albums', []),
+            'tracks': self._library_cache.get('tracks', []),
+            'genres': self._library_cache.get('genres', []),
+            'cached_at': self._library_cache_time.isoformat() if self._library_cache_time else None,
+            'is_cached': self._library_cache_time is not None
+        }
+    
+    def get_library_cache_status(self) -> dict:
+        """Get the status of the library cache.
+        
+        Returns:
+            Dict with cache status information.
+        """
+        cache_age_hours = None
+        if self._library_cache_time:
+            age = datetime.now(timezone.utc) - self._library_cache_time
+            cache_age_hours = age.total_seconds() / 3600
+        
+        return {
+            'is_cached': self._library_cache_time is not None,
+            'cached_at': self._library_cache_time.isoformat() if self._library_cache_time else None,
+            'cache_age_hours': round(cache_age_hours, 2) if cache_age_hours else None,
+            'refresh_interval_hours': self._settings.library_cache_refresh_hours,
+            'refresh_hour': self._settings.library_cache_refresh_hour,
+            'item_counts': {
+                'artists': len(self._library_cache.get('artists', [])),
+                'albums': len(self._library_cache.get('albums', [])),
+                'tracks': len(self._library_cache.get('tracks', [])),
+                'genres': len(self._library_cache.get('genres', []))
+            }
+        }

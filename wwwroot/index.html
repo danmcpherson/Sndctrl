@@ -66,6 +66,7 @@
                 <nav class="tab-nav">
                     <button class="tab-btn active" data-tab="speakers">Speakers</button>
                     <button class="tab-btn" data-tab="macros">Macros</button>
+                    <button class="tab-btn" data-tab="library">Library</button>
                     <button class="tab-btn" data-tab="favorites">Favorites</button>
                     <button class="tab-btn" data-tab="queue">Queue</button>
                 </nav>
@@ -135,6 +136,74 @@
                     </div>
                     <div id="macros-list" class="macros-list">
                         <!-- Macro cards will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Library Tab -->
+                <div id="library-tab" class="tab-content">
+                    <div class="section-header">
+                        <h2>Music Library</h2>
+                        <p class="subtitle">Browse and search your local music collection</p>
+                        <div class="header-actions">
+                            <div class="library-search-container">
+                                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                                <input type="search" id="library-search" class="library-search-input" placeholder="Search your music...">
+                            </div>
+                            <select id="library-speaker-select" class="speaker-select">
+                                <option value="">Select speaker...</option>
+                            </select>
+                            <button id="library-refresh-btn" class="btn-icon" title="Refresh library cache">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <polyline points="1 20 1 14 7 14"></polyline>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Category Tabs -->
+                    <nav class="sub-tab-nav">
+                        <button class="sub-tab-btn active" data-library-category="artists">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            Artists
+                        </button>
+                        <button class="sub-tab-btn" data-library-category="albums">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            Albums
+                        </button>
+                        <button class="sub-tab-btn" data-library-category="tracks">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18V5l12-2v13"></path>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <circle cx="18" cy="16" r="3"></circle>
+                            </svg>
+                            Tracks
+                        </button>
+                        <button class="sub-tab-btn" data-library-category="genres">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="3" y1="9" x2="21" y2="9"></line>
+                                <line x1="9" y1="21" x2="9" y2="9"></line>
+                            </svg>
+                            Genres
+                        </button>
+                    </nav>
+
+                    <div id="library-items" class="content-grid">
+                        <div class="loading-message">
+                            <div class="spinner"></div>
+                            <p>Loading library...</p>
+                        </div>
                     </div>
                 </div>
 
@@ -437,6 +506,7 @@
     <script src="js/ui-components.js"></script>
     <script src="js/speakers.js"></script>
     <script src="js/macros.js"></script>
+    <script src="js/library.js"></script>
     <script src="js/favorites.js"></script>
     <script src="js/queue.js"></script>
     <script src="js/app.js"></script>

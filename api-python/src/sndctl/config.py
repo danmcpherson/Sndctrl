@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     sndctl_device_id: str | None = None   # 12-character hex device ID
     sndctl_device_secret: str | None = None  # 64-character hex device secret
     
+    # Library cache settings
+    # Cache refresh interval in hours (0 to disable server-side caching)
+    library_cache_refresh_hours: int = 24
+    library_cache_refresh_hour: int = 3  # Hour (0-23) to refresh cache (local time)
+    
     # Auto-upgrade settings
     # Ring determines upgrade priority: 0 = canary (immediate), 1-3 = staged rollout
     # Higher rings get updates later after lower rings validate stability

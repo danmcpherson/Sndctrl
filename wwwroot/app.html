@@ -146,6 +146,58 @@
                 </div>
             </section>
 
+            <!-- Library Tab -->
+            <section id="library-tab" class="tab-content">
+                <div class="library-container">
+                    <!-- Search Bar -->
+                    <div class="library-search-bar">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="search" id="library-search" class="library-search-input" placeholder="Search your music...">
+                    </div>
+
+                    <!-- Category Tabs -->
+                    <div class="library-categories">
+                        <button class="library-category-btn active" data-library-category="artists">Artists</button>
+                        <button class="library-category-btn" data-library-category="albums">Albums</button>
+                        <button class="library-category-btn" data-library-category="tracks">Tracks</button>
+                        <button class="library-category-btn" data-library-category="genres">Genres</button>
+                    </div>
+
+                    <!-- Speaker Selection and Refresh -->
+                    <div class="library-speaker-select-container">
+                        <label for="library-speaker-select" class="library-speaker-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                                <circle cx="12" cy="14" r="4"></circle>
+                                <line x1="12" y1="6" x2="12.01" y2="6"></line>
+                            </svg>
+                            Play on:
+                        </label>
+                        <select id="library-speaker-select" class="library-speaker-select">
+                            <option value="">Select speaker...</option>
+                        </select>
+                        <button id="library-refresh-btn" class="library-refresh-btn" title="Refresh library cache">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Items List -->
+                    <div id="library-items" class="library-items">
+                        <div class="loading-message-mobile">
+                            <div class="spinner-mobile"></div>
+                            <p>Loading library...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Voice Tab -->
             <section id="voice-tab" class="tab-content">
                 <div class="voice-container">
@@ -266,6 +318,19 @@
                             </svg>
                         </button>
                         <div id="voice-state" class="voice-state">Tap to speak</div>
+                        <!-- Text Input for typing commands -->
+                        <div class="voice-text-input-container">
+                            <input type="text" id="voice-text-input" class="voice-text-input" 
+                                   placeholder="Or type a command..." 
+                                   autocomplete="off"
+                                   onkeydown="if(event.key==='Enter') voiceAssistant.sendTextCommand()">
+                            <button id="voice-text-send" class="voice-text-send" onclick="voiceAssistant.sendTextCommand()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -287,6 +352,15 @@
                 </svg>
                 <span>Speakers</span>
             </button>
+            <button class="tab-button" data-tab="library-tab" onclick="mobileApp.switchTab('library-tab')">
+                <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18M3 12h18M3 18h18"></path>
+                    <circle cx="6" cy="6" r="1" fill="currentColor"></circle>
+                    <circle cx="6" cy="12" r="1" fill="currentColor"></circle>
+                    <circle cx="6" cy="18" r="1" fill="currentColor"></circle>
+                </svg>
+                <span>Library</span>
+            </button>
             <button class="tab-button" data-tab="voice-tab" onclick="mobileApp.switchTab('voice-tab')">
                 <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
@@ -303,6 +377,7 @@
     </div>
 
     <script src="js/api.js"></script>
+    <script src="js/library.js"></script>
     <script src="js/voice.js"></script>
     <script src="js/app-mobile.js"></script>
 </body>

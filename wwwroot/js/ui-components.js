@@ -412,6 +412,12 @@ function setupTabNavigation() {
                 case 'macros':
                     macros.load();
                     break;
+                case 'library':
+                    if (typeof library !== 'undefined') {
+                        library.loadSpeakers();
+                        library.loadCategory();
+                    }
+                    break;
                 case 'favorites':
                     favorites.updateSpeakerSelector();
                     favorites.switchSubTab('sonos-favorites');

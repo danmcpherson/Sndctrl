@@ -285,6 +285,12 @@ window.mobileApp = {
         // Refresh data when switching tabs
         if (tabId === 'speakers-tab') {
             this.updateAllSpeakers();
+        } else if (tabId === 'library-tab') {
+            // Load library data
+            if (typeof library !== 'undefined') {
+                library.loadSpeakers();
+                library.loadCategory();
+            }
         }
     },
 

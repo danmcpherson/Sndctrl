@@ -1000,6 +1000,109 @@ window.voiceAssistant = {
     },
 
     /**
+     * Send a text command (typed input instead of voice)
+     */
+    async sendTextCommand() {
+        const input = document.getElementById('voice-text-input');
+        const text = input?.value?.trim();
+        
+        if (!text) return;
+        
+        // Clear input
+        input.value = '';
+        
+        // Show what user typed in conversation
+        this.addMessage('user', text);
+        
+        // If not connected, connect in text-only mode
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            this.updateState('Connecting...');
+            this.textOnlyMode = true;  // Flag for text-only connection
+            const connected = await this.connectForText();
+            if (!connected) {
+                this.showError('Failed to connect. Please try again.');
+                this.textOnlyMode = false;
+                return;
+            }
+            // Wait a moment for the WebSocket to be ready
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Send text as a conversation item
+        this.ws.send(JSON.stringify({
+            type: 'conversation.item.create',
+            item: {
+                type: 'message',
+                role: 'user',
+                content: [{
+                    type: 'input_text',
+                    text: text
+                }]
+            }
+        }));
+        
+        // Request a response
+        this.ws.send(JSON.stringify({
+            type: 'response.create'
+        }));
+        
+        this.updateState('Processing...');
+    },
+
+    /**
+     * Connect to OpenAI Realtime API for text-only mode (no audio)
+     */
+    async connectForText() {
+        return new Promise(async (resolve) => {
+            try {
+                // Get ephemeral session token from our backend with selected voice
+                const voice = this.selectedVoice || 'verse';
+                const response = await fetch(`/api/voice/session?voice=${encodeURIComponent(voice)}`, { method: 'POST' });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Failed to create session');
+                }
+                
+                const session = await response.json();
+                const ephemeralKey = session.client_secret?.value;
+                
+                if (!ephemeralKey) {
+                    throw new Error('No ephemeral key received');
+                }
+
+                // Connect to OpenAI Realtime API
+                const wsUrl = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17';
+                this.ws = new WebSocket(wsUrl, [
+                    'realtime',
+                    `openai-insecure-api-key.${ephemeralKey}`,
+                    'openai-beta.realtime-v1'
+                ]);
+
+                this.ws.onopen = () => {
+                    console.log('Connected to OpenAI Realtime API (text mode)');
+                    this.isConnected = true;
+                    this.updateState('Ready');
+                    resolve(true);
+                };
+                this.ws.onmessage = (event) => this.onWebSocketMessage(event);
+                this.ws.onerror = (error) => {
+                    this.onWebSocketError(error);
+                    resolve(false);
+                };
+                this.ws.onclose = (event) => this.onWebSocketClose(event);
+                
+            } catch (error) {
+                console.error('Failed to connect:', error);
+                this.showError('Connection failed: ' + error.message);
+                this.cleanup();
+                this.updateState('idle');
+                resolve(false);
+            }
+        });
+    },
+
+    /**
      * Response completed
      */
     onResponseDone(message) {

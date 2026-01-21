@@ -9,6 +9,7 @@ import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from ..models import (
     ListItem,
@@ -23,6 +24,12 @@ from ..services import SocoCliService, SonosCommandService, SoCoService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sonos", tags=["sonos"])
+
+
+class PlayUriRequest(BaseModel):
+    """Request to play a URI."""
+    uri: str
+
 
 # These will be set by the main app
 _soco_cli_service: SocoCliService | None = None
@@ -461,6 +468,21 @@ async def get_favorites() -> dict:
 async def play_favorite(speaker_name: str, favorite_name: str) -> dict:
     """Play a favorite by name using SoCo library."""
     success = await _get_soco_service().play_favorite(speaker_name, favorite_name)
+    return {"success": success}
+
+
+@router.post("/speakers/{speaker_name}/play-uri")
+async def play_uri(speaker_name: str, request: PlayUriRequest) -> dict:
+    """Play a URI on the speaker.
+    
+    Args:
+        speaker_name: Name of the speaker.
+        request: Request with URI to play (e.g., from library browsing).
+        
+    Returns:
+        Success status.
+    """
+    success = await _get_soco_service().play_uri(speaker_name, request.uri)
     return {"success": success}
 
 

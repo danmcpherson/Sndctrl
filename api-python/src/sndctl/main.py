@@ -15,6 +15,7 @@ from .routers import macros as macros_router
 from .routers import sonos as sonos_router
 from .routers import upgrades as upgrades_router
 from .routers import voice as voice_router
+from .routers import library as library_router
 from .services import MacroService, SocoCliService, SonosCommandService, SoCoService
 
 # Configure logging
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI):
     # Initialize routers with services
     sonos_router.init_router(_soco_cli_service, _command_service, _soco_service)
     macros_router.init_router(_macro_service)
+    library_router.init_router(_soco_service)
     voice_router.init_router(settings)
     
     # Pre-discover speakers on startup
@@ -60,12 +62,16 @@ async def lifespan(app: FastAPI):
     speakers = await _soco_service.discover_speakers()
     logger.info("Found %d speakers: %s", len(speakers), ", ".join(speakers))
     
+    # Start library cache scheduler (refreshes library cache on schedule)
+    await _soco_service.start_library_cache_scheduler()
+    
     logger.info("Services initialized")
     
     yield
     
     # Cleanup
     logger.info("Shutting down...")
+    await _soco_service.stop_library_cache_scheduler()
     await _command_service.close()
     await _macro_service.close()
     _soco_cli_service.stop_server()
@@ -106,6 +112,7 @@ app.include_router(sonos_router.router)
 app.include_router(macros_router.router)
 app.include_router(voice_router.router)
 app.include_router(upgrades_router.router)
+app.include_router(library_router.router)
 
 
 @app.get("/api/version")
